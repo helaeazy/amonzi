@@ -1,5 +1,5 @@
 import { FormEvent, useRef, useDeferredValue, useEffect, useState, useTransition } from "react";
-import { Search, LayoutList, MessageSquare, User as UserIcon, Settings, Globe, ChevronLeft, ChevronRight, MoreHorizontal, LogOut } from "lucide-react";
+import { Search, LayoutList, MessageSquare, User as UserIcon, Globe, ChevronLeft, ChevronRight, MoreHorizontal, LogOut, Eye, MousePointerClick, Share2, Plus, Trash2, X } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import type { User } from "firebase/auth";
@@ -11,7 +11,7 @@ import {
   signOutFromGoogle,
   subscribeToAuth,
 } from "./firebase";
-import type { Listing, Member, Rental } from "./types";
+import type { Listing, Member, Rental, Review } from "./types";
 
 const categories = [
   "all",
@@ -50,29 +50,44 @@ const en = {
   nav: { explore: "Explore", myPosts: "My Posts", offers: "Offers", profile: "Profile", settings: "Settings" },
   settings: { title: "Settings", subtitle: "Manage your account preferences.", language: "Language", langEn: "English", langLv: "Latvian" },
   footer: { support: "Support", privacy: "Privacy Policy", terms: "Terms of Use", rights: "All rights reserved.", tagline: "Simple rentals. Fast access. Clear listings." },
-  pagination: { prev: "Previous", next: "Next", of: "of" },
+  pagination: { prev: "Previous", next: "Next" },
+  common: {
+    day: "day", deposit: "Deposit", reviews: "reviews", delete: "Delete", cancel: "Cancel",
+    publishing: "Publishing...", publish: "Publish listing", newListing: "New listing",
+    noListings: "You have not posted any listings yet.", signOut: "Sign out", hostedBy: "Hosted by",
+    authDisabled: "Auth disabled",
+  },
+  notices: {
+    listingPublished: "Listing published.", listingDeleted: "Listing deleted.",
+    rentalSent: "Rental request sent.", reviewPosted: "Review posted.",
+    updatingFilters: "Updating filters…", loading: "Loading…",
+    backendError: "Backend is not reachable. Start `make server`.",
+  },
   explore: {
     title: "Find a rental",
-    search: "Search",
-    searchPlaceholder: "Search listing, city, or owner",
-    category: "Category",
-    city: "City",
-    sort: "Sort",
-    allCategories: "All categories",
-    allCities: "All cities",
-    sortNewest: "Newest first",
-    sortPriceLow: "Price: low to high",
-    sortPriceHigh: "Price: high to low",
-    categories: {
-      all: "All categories",
-      tools: "Tools",
-      vehicles: "Vehicles",
-      electronics: "Electronics",
-      events: "Events",
-      home: "Home",
-      outdoor: "Outdoor",
-      other: "Other",
-    },
+    search: "Search", searchPlaceholder: "Search listing, city, or owner",
+    category: "Category", city: "City", sort: "Sort",
+    allCategories: "All categories", allCities: "All cities",
+    sortNewest: "Newest first", sortPriceLow: "Price: low to high", sortPriceHigh: "Price: high to low",
+    aboutOwner: "About the owner", memberSinceShort: "Member since",
+    views: "Views", clicks: "Clicks", shares: "Shares",
+    categories: { all: "All categories", tools: "Tools", vehicles: "Vehicles", electronics: "Electronics", events: "Events", home: "Home", outdoor: "Outdoor", other: "Other" },
+  },
+  myPosts: {
+    title: "My Posts", subtitle: "Items you have listed for rent.",
+    placeholderTitle: "Listing title", placeholderDesc: "What is included, condition, pickup details",
+    placeholderCity: "City", placeholderPrice: "Price per day (€)", placeholderDeposit: "Deposit (€)", placeholderImage: "Image URL",
+  },
+  modal: {
+    perDay: "/ day", deposit: "Deposit", owner: "Owner", memberSince: "Member since",
+    responseTime: "Response time", noReviews: "No reviews yet.", reviews: "Reviews",
+    close: "Close", listed: "Listed",
+  },
+  offers: { title: "Offers", subtitle: "Messages and rental requests from other members.", empty: "No offers yet. This is where incoming rental requests and messages will appear." },
+  profile: {
+    publicProfile: "Public profile", bioPlaceholder: "Your public bio appears here.",
+    score: "Score", reviews: "Reviews", listings: "Listings", rentals: "Rentals",
+    inventory: "Your active inventory", addCity: "Add your city after sign-in",
   },
 };
 
@@ -80,29 +95,44 @@ const lv: typeof en = {
   nav: { explore: "Meklēt", myPosts: "Mani sludinājumi", offers: "Piedāvājumi", profile: "Profils", settings: "Iestatījumi" },
   settings: { title: "Iestatījumi", subtitle: "Pārvaldiet sava konta preferences.", language: "Valoda", langEn: "Angļu", langLv: "Latviešu" },
   footer: { support: "Atbalsts", privacy: "Privātuma politika", terms: "Lietošanas noteikumi", rights: "Visas tiesības aizsargātas.", tagline: "Vienkārša noma. Ātra ieeja. Skaidri sludinājumi." },
-  pagination: { prev: "Iepriekšējā", next: "Nākamā", of: "no" },
+  pagination: { prev: "Iepriekšējā", next: "Nākamā" },
+  common: {
+    day: "diena", deposit: "Depozīts", reviews: "atsauksmes", delete: "Dzēst", cancel: "Atcelt",
+    publishing: "Publicē...", publish: "Publicēt sludinājumu", newListing: "Jauns sludinājums",
+    noListings: "Jūs vēl neesat publicējis nevienu sludinājumu.", signOut: "Iziet", hostedBy: "Publicē",
+    authDisabled: "Autentifikācija atspējota",
+  },
+  notices: {
+    listingPublished: "Sludinājums publicēts.", listingDeleted: "Sludinājums dzēsts.",
+    rentalSent: "Nomas pieprasījums nosūtīts.", reviewPosted: "Atsauksme publicēta.",
+    updatingFilters: "Atjaunina filtrus…", loading: "Ielādē…",
+    backendError: "Serveris nav sasniedzams. Palaidiet `make server`.",
+  },
   explore: {
     title: "Atrast nomu",
-    search: "Meklēt",
-    searchPlaceholder: "Meklēt sludinājumu, pilsētu vai īpašnieku",
-    category: "Kategorija",
-    city: "Pilsēta",
-    sort: "Kārtot",
-    allCategories: "Visas kategorijas",
-    allCities: "Visas pilsētas",
-    sortNewest: "Jaunākie pirmie",
-    sortPriceLow: "Cena: no zemākas",
-    sortPriceHigh: "Cena: no augstākas",
-    categories: {
-      all: "Visas kategorijas",
-      tools: "Instrumenti",
-      vehicles: "Transportlīdzekļi",
-      electronics: "Elektronika",
-      events: "Pasākumi",
-      home: "Māja",
-      outdoor: "Daba",
-      other: "Cits",
-    },
+    search: "Meklēt", searchPlaceholder: "Meklēt sludinājumu, pilsētu vai īpašnieku",
+    category: "Kategorija", city: "Pilsēta", sort: "Kārtot",
+    allCategories: "Visas kategorijas", allCities: "Visas pilsētas",
+    sortNewest: "Jaunākie pirmie", sortPriceLow: "Cena: no zemākas", sortPriceHigh: "Cena: no augstākas",
+    aboutOwner: "Par īpašnieku", memberSinceShort: "Dalībnieks kopš",
+    views: "Skatījumi", clicks: "Klikšķi", shares: "Dalīšanās",
+    categories: { all: "Visas kategorijas", tools: "Instrumenti", vehicles: "Transportlīdzekļi", electronics: "Elektronika", events: "Pasākumi", home: "Māja", outdoor: "Daba", other: "Cits" },
+  },
+  myPosts: {
+    title: "Mani sludinājumi", subtitle: "Preces, ko esat izlikuši iznomāšanai.",
+    placeholderTitle: "Sludinājuma nosaukums", placeholderDesc: "Kas iekļauts, stāvoklis, paņemšanas detaļas",
+    placeholderCity: "Pilsēta", placeholderPrice: "Cena dienā (€)", placeholderDeposit: "Depozīts (€)", placeholderImage: "Attēla URL",
+  },
+  modal: {
+    perDay: "/ dienā", deposit: "Depozīts", owner: "Īpašnieks", memberSince: "Dalībnieks kopš",
+    responseTime: "Atbildes laiks", noReviews: "Pagaidām nav atsauksmju.", reviews: "Atsauksmes",
+    close: "Aizvērt", listed: "Publicēts",
+  },
+  offers: { title: "Piedāvājumi", subtitle: "Ziņojumi un nomas pieprasījumi no citiem lietotājiem.", empty: "Pagaidām nav piedāvājumu. Šeit parādīsies ienākošie nomas pieprasījumi." },
+  profile: {
+    publicProfile: "Publiskais profils", bioPlaceholder: "Jūsu publiskā biogrāfija parādīsies šeit.",
+    score: "Vērtējums", reviews: "Atsauksmes", listings: "Sludinājumi", rentals: "Nomas",
+    inventory: "Jūsu aktīvais inventārs", addCity: "Pievienojiet pilsētu pēc pieteikšanās",
   },
 };
 
@@ -123,10 +153,14 @@ function App() {
   const [reviewForm, setReviewForm] = useState(initialReviewForm);
   const [notice, setNotice] = useState("");
   const [isPending, startTransition] = useTransition();
+  const [isHeaderHiddenOnScroll, setIsHeaderHiddenOnScroll] = useState(false);
+  const [isListingModalOpen, setIsListingModalOpen] = useState(false);
   const [lang, setLang] = useState<"en" | "lv">(() => {
     return (localStorage.getItem("lang") as "en" | "lv") || "en";
   });
   const t = lang === "lv" ? lv : en;
+  const tRef = useRef(t);
+  tRef.current = t;
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const avatarRef = useRef<HTMLDivElement>(null);
 
@@ -141,6 +175,27 @@ function App() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [avatarMenuOpen]);
   const deferredSearch = useDeferredValue(search);
+
+  useEffect(() => {
+    let lastScrollY = window.scrollY;
+
+    function handleScroll() {
+      const currentScrollY = window.scrollY;
+      const isNearTop = currentScrollY < 24;
+      const isScrollingDown = currentScrollY > lastScrollY;
+
+      setIsHeaderHiddenOnScroll(!isNearTop && isScrollingDown);
+      lastScrollY = currentScrollY;
+    }
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    setIsListingModalOpen(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     return subscribeToAuth((user) => {
@@ -204,7 +259,7 @@ function App() {
   const listingMutation = useMutation({
     mutationFn: api.createListing,
     onSuccess: async () => {
-      setNotice("Listing published.");
+      setNotice(tRef.current.notices.listingPublished);
       setListingForm(initialListingForm);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["listings"] }),
@@ -214,10 +269,21 @@ function App() {
     },
   });
 
+  const deleteListingMutation = useMutation({
+    mutationFn: api.deleteListing,
+    onSuccess: async () => {
+      setNotice(tRef.current.notices.listingDeleted);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["listings"] }),
+        queryClient.invalidateQueries({ queryKey: ["overview"] }),
+      ]);
+    },
+  });
+
   const rentalMutation = useMutation({
     mutationFn: api.createRental,
     onSuccess: async () => {
-      setNotice("Rental request sent.");
+      setNotice(tRef.current.notices.rentalSent);
       setRentalForm(initialRentalForm);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["rentals"] }),
@@ -229,7 +295,7 @@ function App() {
   const reviewMutation = useMutation({
     mutationFn: api.createReview,
     onSuccess: async () => {
-      setNotice("Review posted.");
+      setNotice(tRef.current.notices.reviewPosted);
       setReviewForm(initialReviewForm);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["reviews"] }),
@@ -390,7 +456,7 @@ function App() {
 
   return (
     <div className={isSidebarCollapsed ? "app-shell sidebar-collapsed" : "app-shell"}>
-      <header className="app-header">
+      <header className={`app-header${isHeaderHiddenOnScroll || isListingModalOpen ? " app-header--hidden" : ""}`}>
         <Link className="app-header-logo" to="/app">
           Amonzi
         </Link>
@@ -402,7 +468,7 @@ function App() {
             {isAuthDisabled() ? (
               <>
                 <strong>{currentMember?.full_name || "Demo member"}</strong>
-                <small>Auth disabled</small>
+                <small>{t.common.authDisabled}</small>
               </>
             ) : (
               <>
@@ -428,7 +494,7 @@ function App() {
                   {currentMember ? (
                     <span className="rating-line">
                       <StarRating score={currentMember.score} />
-                      {currentMember.review_count} reviews
+                      {currentMember.review_count} {t.common.reviews}
                     </span>
                   ) : null}
                   {avatarMenuOpen && (
@@ -439,7 +505,7 @@ function App() {
                         type="button"
                       >
                         <LogOut size={15} />
-                        Sign out
+                        {t.common.signOut}
                       </button>
                     </div>
                   )}
@@ -473,6 +539,7 @@ function App() {
       <main className="main-panel">
         {notice ? <div className="notice">{notice}</div> : null}
 
+        <div className="route-transition" key={location.pathname}>
         <Routes>
           <Route path="/" element={<Navigate replace to="/app" />} />
           <Route
@@ -482,6 +549,7 @@ function App() {
                 activeMember={currentMember}
                 cityOptions={cityOptions}
                 filteredListings={filteredListings}
+                reviews={reviews}
                 onCategoryChange={(category) =>
                   startTransition(() => setSelectedCategory(category))
                 }
@@ -494,6 +562,7 @@ function App() {
                 selectedCategory={selectedCategory}
                 sortOrder={sortOrder}
                 t={t}
+                onModalOpenChange={setIsListingModalOpen}
               />
             }
           />
@@ -508,8 +577,20 @@ function App() {
               />
             }
           />
-          <Route path="/app/my-posts" element={<MyPostsScreen activeMember={currentMember} listings={listings} />} />
-          <Route path="/app/offers" element={<OffersScreen activeMember={currentMember} />} />
+          <Route path="/app/my-posts" element={
+            <MyPostsScreen
+              activeMember={currentMember}
+              listings={listings}
+              form={listingForm}
+              isBusy={listingMutation.isPending}
+              isDeleting={deleteListingMutation.isPending}
+              onChange={setListingForm}
+              onSubmit={handleListingSubmit}
+              onDelete={(id) => deleteListingMutation.mutate(id)}
+              t={t}
+            />
+          } />
+          <Route path="/app/offers" element={<OffersScreen activeMember={currentMember} t={t} />} />
           <Route path="/app/settings" element={<SettingsScreen activeMember={currentMember} lang={lang} onLangChange={(l) => { setLang(l); localStorage.setItem("lang", l); }} t={t} />} />
           <Route
             path="/app/profile"
@@ -518,19 +599,21 @@ function App() {
                 activeMember={currentMember}
                 listings={listings}
                 rentals={rentals}
+                t={t}
               />
             }
           />
           <Route path="*" element={<Navigate replace to="/app" />} />
         </Routes>
+        </div>
 
         {overviewQuery.isLoading || listingsQuery.isLoading || membersQuery.isLoading ? (
-          <div className="loading-sheet">Loading Amonzi…</div>
+          <div className="loading-sheet">{t.notices.loading}</div>
         ) : null}
         {overviewQuery.error || listingsQuery.error || membersQuery.error ? (
-          <div className="error-sheet">Backend is not reachable. Start `make server`.</div>
+          <div className="error-sheet">{t.notices.backendError}</div>
         ) : null}
-        {isPending ? <div className="ghost-chip">Updating filters…</div> : null}
+        {isPending ? <div className="ghost-chip">{t.notices.updatingFilters}</div> : null}
       </main>
 
       <footer className="app-footer">
@@ -764,6 +847,7 @@ function ExploreScreen(props: {
   activeMember: Member | null;
   cityOptions: string[];
   filteredListings: Listing[];
+  reviews: Review[];
   onCategoryChange: (category: string) => void;
   onCityChange: (city: string) => void;
   onSearchChange: (value: string) => void;
@@ -774,7 +858,9 @@ function ExploreScreen(props: {
   selectedCategory: string;
   sortOrder: string;
   t: typeof en;
+  onModalOpenChange: (isOpen: boolean) => void;
 }) {
+  const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
   const PAGE_SIZE = 9;
   const [page, setPage] = useState(1);
   const totalPages = Math.max(1, Math.ceil(props.filteredListings.length / PAGE_SIZE));
@@ -782,6 +868,13 @@ function ExploreScreen(props: {
   const paginated = props.filteredListings.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   useEffect(() => { setPage(1); }, [props.filteredListings.length, props.selectedCategory, props.selectedCity, props.sortOrder, props.search]);
+  useEffect(() => {
+    props.onModalOpenChange(Boolean(selectedListing));
+  }, [props.onModalOpenChange, selectedListing]);
+
+  useEffect(() => {
+    return () => props.onModalOpenChange(false);
+  }, [props.onModalOpenChange]);
 
   return (
     <main className="screen">
@@ -841,29 +934,45 @@ function ExploreScreen(props: {
         </div>
         <div className="listing-grid">
           {paginated.map((listing) => (
-            <article className="listing-card" key={listing.id}>
+            <article className="listing-card listing-card--clickable" key={listing.id} onClick={() => setSelectedListing(listing)}>
               <div
                 className="listing-image"
                 style={{
-                  backgroundImage: `linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.22)), url(${listing.image_url})`,
+                  backgroundImage: `linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.22)), url(${listing.photo_urls?.[0] || listing.image_url})`,
                 }}
               />
               <div className="listing-body">
                 <div className="listing-top">
-                  <span className="tag">{listing.category}</span>
+                  <span className="tag">{props.t.explore.categories[listing.category as keyof typeof props.t.explore.categories] ?? listing.category}</span>
                   <span className="tag muted">{listing.city}</span>
                 </div>
                 <h4>{listing.title}</h4>
                 <p>{listing.description}</p>
                 <div className="meta-row">
-                  <strong>EUR {listing.price_per_day}/day</strong>
-                  <span>Deposit EUR {listing.deposit}</span>
+                  <strong>EUR {listing.price_per_day}/{props.t.common.day}</strong>
+                  <span>{props.t.common.deposit} EUR {listing.deposit}</span>
+                </div>
+                <div className="owner-preview">
+                  <div className="owner-preview-head">
+                    <div className="avatar-ring owner-preview-avatar">
+                      <img alt={listing.owner.full_name} src={listing.owner.avatar_url} />
+                    </div>
+                    <div className="owner-preview-copy">
+                      <span className="owner-preview-label">{props.t.common.hostedBy}</span>
+                      <strong>{listing.owner.full_name}</strong>
+                      <p>{listing.owner.bio}</p>
+                    </div>
+                  </div>
+                  <div className="owner-preview-meta">
+                    <span>{props.t.modal.responseTime}: {listing.owner.response_time}</span>
+                    <span>{props.t.explore.memberSinceShort} {new Date(listing.owner.joined_at).getFullYear()}</span>
+                  </div>
                 </div>
                 <div className="owner-row">
                   <span>{listing.owner.full_name}</span>
                   <span className="rating-line">
                     <StarRating score={listing.owner.score} />
-                    {listing.owner.review_count} reviews
+                    {listing.owner.review_count} {props.t.common.reviews}
                   </span>
                 </div>
               </div>
@@ -906,6 +1015,15 @@ function ExploreScreen(props: {
           </div>
         )}
       </section>
+
+      {selectedListing && (
+        <ListingModal
+          listing={selectedListing}
+          reviews={props.reviews.filter((r) => r.listing === selectedListing.id)}
+          t={props.t}
+          onClose={() => setSelectedListing(null)}
+        />
+      )}
     </main>
   );
 }
@@ -1160,6 +1278,7 @@ function ProfileScreen(props: {
   activeMember: Member | null;
   listings: Listing[];
   rentals: Rental[];
+  t: typeof en;
 }) {
   if (!props.activeMember) {
     return null;
@@ -1179,28 +1298,28 @@ function ProfileScreen(props: {
           <img alt={props.activeMember.full_name} src={props.activeMember.avatar_url} />
         </div>
         <div>
-          <p className="eyebrow">Public profile</p>
+          <p className="eyebrow">{props.t.profile.publicProfile}</p>
           <h2>{props.activeMember.full_name}</h2>
-          <p className="lead">{props.activeMember.bio || "Your public bio appears here."}</p>
+          <p className="lead">{props.activeMember.bio || props.t.profile.bioPlaceholder}</p>
         </div>
       </section>
       <section className="stats-grid">
         <StatCard
-          label="Score"
+          label={props.t.profile.score}
           value={
             <span className="rating-line">
               <StarRating score={props.activeMember.score} />
             </span>
           }
         />
-        <StatCard label="Reviews" value={props.activeMember.review_count} />
-        <StatCard label="Listings" value={ownedListings.length} />
-        <StatCard label="Rentals" value={rentalCount} />
+        <StatCard label={props.t.profile.reviews} value={props.activeMember.review_count} />
+        <StatCard label={props.t.profile.listings} value={ownedListings.length} />
+        <StatCard label={props.t.profile.rentals} value={rentalCount} />
       </section>
       <section className="surface">
         <div className="section-head">
-          <h3>Your active inventory</h3>
-          <p>{props.activeMember.city || "Add your city after sign-in"}</p>
+          <h3>{props.t.profile.inventory}</h3>
+          <p>{props.activeMember.city || props.t.profile.addCity}</p>
         </div>
         <div className="timeline">
           {ownedListings.map((listing) => (
@@ -1208,7 +1327,7 @@ function ProfileScreen(props: {
               <div>
                 <strong>{listing.title}</strong>
                 <p>
-                  EUR {listing.price_per_day}/day · {listing.category}
+                  EUR {listing.price_per_day}/{props.t.common.day} · {props.t.explore.categories[listing.category as keyof typeof props.t.explore.categories] ?? listing.category}
                 </p>
               </div>
               <span className="status-pill live">{listing.status}</span>
@@ -1243,7 +1362,18 @@ function StatCard(props: { label: string; value: React.ReactNode }) {
   );
 }
 
-function MyPostsScreen(props: { activeMember: Member | null; listings: Listing[] }) {
+function MyPostsScreen(props: {
+  activeMember: Member | null;
+  listings: Listing[];
+  form: typeof initialListingForm;
+  isBusy: boolean;
+  isDeleting: boolean;
+  onChange: React.Dispatch<React.SetStateAction<typeof initialListingForm>>;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onDelete: (id: number) => void;
+  t: typeof en;
+}) {
+  const [showForm, setShowForm] = useState(false);
   const myListings = props.listings.filter(
     (listing) => listing.owner.id === props.activeMember?.id
   );
@@ -1251,12 +1381,77 @@ function MyPostsScreen(props: { activeMember: Member | null; listings: Listing[]
   return (
     <main className="screen">
       <section className="surface">
-        <div className="section-head">
-          <h3>My Posts</h3>
-          <p>Items you have listed for rent.</p>
+        <div className="my-posts-head">
+          <div className="section-head">
+            <h3>{props.t.myPosts.title}</h3>
+            <p>{props.t.myPosts.subtitle}</p>
+          </div>
+          <button
+            className={showForm ? "secondary-button" : "primary-button"}
+            onClick={() => setShowForm((v) => !v)}
+            type="button"
+          >
+            {showForm ? props.t.common.cancel : <><Plus size={16} /> {props.t.common.newListing}</>}
+          </button>
         </div>
+
+        {showForm && (
+          <form
+            className="stack-form my-posts-form"
+            onSubmit={(e) => { props.onSubmit(e); setShowForm(false); }}
+          >
+            <input
+              placeholder={props.t.myPosts.placeholderTitle}
+              value={props.form.title}
+              onChange={(e) => props.onChange((c) => ({ ...c, title: e.target.value }))}
+            />
+            <textarea
+              placeholder={props.t.myPosts.placeholderDesc}
+              value={props.form.description}
+              onChange={(e) => props.onChange((c) => ({ ...c, description: e.target.value }))}
+            />
+            <div className="split">
+              <select
+                value={props.form.category}
+                onChange={(e) => props.onChange((c) => ({ ...c, category: e.target.value }))}
+              >
+                {categories.filter((cat) => cat !== "all").map((cat) => (
+                  <option key={cat} value={cat}>
+                    {props.t.explore.categories[cat as keyof typeof props.t.explore.categories]}
+                  </option>
+                ))}
+              </select>
+              <input
+                placeholder={props.t.myPosts.placeholderCity}
+                value={props.form.city}
+                onChange={(e) => props.onChange((c) => ({ ...c, city: e.target.value }))}
+              />
+            </div>
+            <div className="split">
+              <input
+                placeholder={props.t.myPosts.placeholderPrice}
+                value={props.form.price_per_day}
+                onChange={(e) => props.onChange((c) => ({ ...c, price_per_day: e.target.value }))}
+              />
+              <input
+                placeholder={props.t.myPosts.placeholderDeposit}
+                value={props.form.deposit}
+                onChange={(e) => props.onChange((c) => ({ ...c, deposit: e.target.value }))}
+              />
+            </div>
+            <input
+              placeholder={props.t.myPosts.placeholderImage}
+              value={props.form.image_url}
+              onChange={(e) => props.onChange((c) => ({ ...c, image_url: e.target.value }))}
+            />
+            <button className="primary-button" disabled={props.isBusy} type="submit">
+              {props.isBusy ? props.t.common.publishing : props.t.common.publish}
+            </button>
+          </form>
+        )}
+
         {myListings.length === 0 ? (
-          <div className="notice">You have not posted any listings yet.</div>
+          <div className="notice">{props.t.common.noListings}</div>
         ) : (
           <div className="listing-grid">
             {myListings.map((listing) => (
@@ -1274,10 +1469,18 @@ function MyPostsScreen(props: { activeMember: Member | null; listings: Listing[]
                   </div>
                   <p>{listing.description}</p>
                   <div className="meta-stack">
-                    <span className="tag">{listing.category}</span>
+                    <span className="tag">{props.t.explore.categories[listing.category as keyof typeof props.t.explore.categories] ?? listing.category}</span>
                     <span className="tag">{listing.city}</span>
-                    <span className="tag">€{listing.price_per_day}/day</span>
+                    <span className="tag">€{listing.price_per_day}/{props.t.common.day}</span>
                   </div>
+                  <button
+                    className="delete-button"
+                    disabled={props.isDeleting}
+                    onClick={() => props.onDelete(listing.id)}
+                    type="button"
+                  >
+                    <Trash2 size={14} /> {props.t.common.delete}
+                  </button>
                 </div>
               </article>
             ))}
@@ -1288,15 +1491,15 @@ function MyPostsScreen(props: { activeMember: Member | null; listings: Listing[]
   );
 }
 
-function OffersScreen(props: { activeMember: Member | null }) {
+function OffersScreen(props: { activeMember: Member | null; t: typeof en }) {
   return (
     <main className="screen">
       <section className="surface">
         <div className="section-head">
-          <h3>Offers</h3>
-          <p>Messages and rental requests from other members.</p>
+          <h3>{props.t.offers.title}</h3>
+          <p>{props.t.offers.subtitle}</p>
         </div>
-        <div className="notice">No offers yet. This is where incoming rental requests and messages will appear.</div>
+        <div className="notice">{props.t.offers.empty}</div>
       </section>
     </main>
   );
@@ -1337,6 +1540,214 @@ function SettingsScreen(props: {
       </section>
     </main>
   );
+}
+
+function ListingModal(props: {
+  listing: Listing;
+  reviews: Review[];
+  t: typeof en;
+  onClose: () => void;
+}) {
+  const { listing, reviews, t, onClose } = props;
+  const galleryRef = useRef<HTMLDivElement>(null);
+  const photos = listing.photo_urls?.length ? listing.photo_urls : [listing.image_url].filter(Boolean);
+  const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+    document.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [onClose]);
+
+  useEffect(() => {
+    setActivePhotoIndex(0);
+  }, [listing.id]);
+
+  const handleGalleryScroll = () => {
+    if (!galleryRef.current) return;
+    const slides = Array.from(galleryRef.current.children) as HTMLElement[];
+    if (slides.length === 0) return;
+
+    const scrollLeft = galleryRef.current.scrollLeft;
+    let closestIndex = 0;
+    let closestDistance = Number.POSITIVE_INFINITY;
+
+    slides.forEach((slide, index) => {
+      const distance = Math.abs(slide.offsetLeft - scrollLeft);
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestIndex = index;
+      }
+    });
+
+    setActivePhotoIndex(closestIndex);
+  };
+
+  const scrollToPhoto = (index: number) => {
+    if (!galleryRef.current) return;
+    const slides = Array.from(galleryRef.current.children) as HTMLElement[];
+    const targetSlide = slides[index];
+    if (!targetSlide) return;
+
+    galleryRef.current.scrollTo({
+      left: targetSlide.offsetLeft,
+      behavior: "smooth",
+    });
+    setActivePhotoIndex(index);
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-center">
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-scroll">
+          <button className="modal-close" onClick={onClose} type="button" aria-label={t.modal.close}>
+            <X size={20} />
+          </button>
+
+          {/* ── Photos ── */}
+          {photos.length > 0 && (
+            <>
+              <div className="modal-gallery-frame">
+                <div className="modal-gallery" ref={galleryRef} onScroll={handleGalleryScroll}>
+                  {photos.map((photo, index) => (
+                    <div className="modal-gallery-image" key={`${listing.id}-${index}`} style={{ backgroundImage: `url(${photo})` }} />
+                  ))}
+                </div>
+              </div>
+              {photos.length > 1 && (
+                <div className="modal-gallery-dots">
+                  {photos.map((_, index) => (
+                    <button
+                      aria-label={`Show photo ${index + 1}`}
+                      className={`modal-gallery-dot${index === activePhotoIndex ? " active" : ""}`}
+                      key={`${listing.id}-dot-${index}`}
+                      onClick={() => scrollToPhoto(index)}
+                      type="button"
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          <div className="modal-body">
+          {/* ── Title + price ── */}
+          <div className="modal-header-block">
+            <p className="modal-kicker">{t.explore.categories[listing.category as keyof typeof t.explore.categories] ?? listing.category}</p>
+            <div className="modal-header-row">
+              <div>
+                <h2 className="modal-title">{listing.title}</h2>
+              </div>
+              <div className="modal-price">
+                <div className="modal-price-line">
+                  <strong>EUR {listing.price_per_day}</strong>
+                  <span className="modal-price-unit">{t.modal.perDay}</span>
+                </div>
+              </div>
+            </div>
+            {Number(listing.rating) > 0 && (
+              <div className="modal-rating">
+                <span className="modal-rating-label">Rating</span>
+                <div className="modal-rating-value">
+                  <StarRating score={listing.rating} />
+                  <span>({listing.review_count})</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Details ── */}
+          <div className="modal-meta">
+            <div className="modal-meta-item">
+              <span className="modal-meta-label">City</span>
+              <strong>{listing.city}</strong>
+            </div>
+            <div className="modal-meta-item">
+              <span className="modal-meta-label">{t.modal.deposit}</span>
+              <strong>EUR {listing.deposit}</strong>
+            </div>
+            <div className="modal-meta-item">
+              <span className="modal-meta-label">{t.modal.listed}</span>
+              <strong>{new Date(listing.created_at).toLocaleDateString()}</strong>
+            </div>
+            <div className="modal-meta-item">
+              <span className="modal-meta-label">{t.explore.views}</span>
+              <strong><Eye size={15} /> {formatCompactCount(listing.views_count)}</strong>
+            </div>
+            <div className="modal-meta-item">
+              <span className="modal-meta-label">{t.explore.clicks}</span>
+              <strong><MousePointerClick size={15} /> {formatCompactCount(listing.clicks_count)}</strong>
+            </div>
+            <div className="modal-meta-item">
+              <span className="modal-meta-label">{t.explore.shares}</span>
+              <strong><Share2 size={15} /> {formatCompactCount(listing.shares_count)}</strong>
+            </div>
+          </div>
+
+          {/* ── Description ── */}
+          <div className="modal-section">
+            <p className="modal-section-label">About this listing</p>
+            <p className="modal-desc">{listing.description}</p>
+          </div>
+
+          <div className="modal-divider" />
+
+          {/* ── Owner ── */}
+          <div className="modal-owner">
+            <div className="avatar-ring">
+              <img alt={listing.owner.full_name} src={listing.owner.avatar_url} />
+            </div>
+            <div>
+              <p className="modal-owner-label">{t.modal.owner}</p>
+              <strong>{listing.owner.full_name}</strong>
+              <div className="modal-owner-meta">
+                <span><StarRating score={listing.owner.score} /> {listing.owner.review_count} {t.common.reviews}</span>
+                {listing.owner.response_time && <span>{t.modal.responseTime}: {listing.owner.response_time}</span>}
+                {listing.owner.joined_at && <span>{t.modal.memberSince}: {new Date(listing.owner.joined_at).getFullYear()}</span>}
+              </div>
+            </div>
+          </div>
+
+          <div className="modal-divider" />
+
+          {/* ── Reviews ── */}
+          <div className="modal-reviews">
+            <h4>{t.modal.reviews} ({reviews.length})</h4>
+            {reviews.length === 0 ? (
+              <p className="modal-no-reviews">{t.modal.noReviews}</p>
+            ) : (
+              <div className="modal-reviews-list">
+                {reviews.map((review) => (
+                  <div className="modal-review-card" key={review.id}>
+                    <div className="modal-review-top">
+                      <strong>{review.author_name}</strong>
+                      <StarRating score={review.rating} />
+                    </div>
+                    <p>{review.comment}</p>
+                    <small>{new Date(review.created_at).toLocaleDateString()}</small>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+        </div>
+      </div>
+      </div>
+    </div>
+  );
+}
+
+function formatCompactCount(value: number) {
+  return new Intl.NumberFormat("en", {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(value);
 }
 
 export default App;

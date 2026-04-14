@@ -21,7 +21,11 @@ export type Listing = {
   price_per_day: string;
   deposit: string;
   image_url: string;
+  photo_urls: string[];
   status: string;
+  views_count: number;
+  clicks_count: number;
+  shares_count: number;
   created_at: string;
   owner: Member;
   rating: string;

@@ -52,8 +52,24 @@ class ListingSerializer(serializers.ModelSerializer):
     owner_id = serializers.PrimaryKeyRelatedField(
         queryset=Member.objects.all(), source="owner", write_only=True
     )
+    photo_urls = serializers.ListField(
+        child=serializers.URLField(), required=False, allow_empty=True
+    )
     rating = serializers.DecimalField(max_digits=2, decimal_places=1, read_only=True)
     review_count = serializers.IntegerField(read_only=True)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        image_url = attrs.get("image_url") or getattr(self.instance, "image_url", "")
+        photo_urls = attrs.get("photo_urls")
+
+        if photo_urls is None:
+            existing_photo_urls = getattr(self.instance, "photo_urls", [])
+            attrs["photo_urls"] = existing_photo_urls or ([image_url] if image_url else [])
+        elif not photo_urls and image_url:
+            attrs["photo_urls"] = [image_url]
+
+        return attrs
 
     class Meta:
         model = Listing
@@ -66,7 +82,11 @@ class ListingSerializer(serializers.ModelSerializer):
             "price_per_day",
             "deposit",
             "image_url",
+            "photo_urls",
             "status",
+            "views_count",
+            "clicks_count",
+            "shares_count",
             "created_at",
             "owner",
             "owner_id",

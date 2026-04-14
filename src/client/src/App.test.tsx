@@ -5,14 +5,12 @@ import { describe, expect, it, vi } from "vitest";
 import App from "./App";
 
 vi.mock("./firebase", () => ({
+  isAuthDisabled: () => false,
   isFirebaseConfigured: () => true,
   signInWithGoogle: vi.fn(),
   signOutFromGoogle: vi.fn(),
   subscribeToAuth: (callback: (user: { displayName: string; email: string } | null) => void) => {
-    callback({
-      displayName: "Test User",
-      email: "test@example.com",
-    });
+    callback(null);
     return () => undefined;
   },
 }));
@@ -79,7 +77,7 @@ describe("App", () => {
 
     expect(
       await screen.findByRole("heading", {
-        name: "Rent almost anything, fast.",
+        name: "Redzi, gribi, nomā.",
       })
     ).toBeInTheDocument();
   });
