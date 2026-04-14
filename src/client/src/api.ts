@@ -22,9 +22,24 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   getOverview: () => request<Overview>("/overview/"),
   getListings: () => request<Listing[]>("/listings/"),
-  getMembers: () => request<Member[]>("/members/"),
+  getMembers: (email?: string) =>
+    request<Member[]>(
+      email ? `/members/?email=${encodeURIComponent(email)}` : "/members/"
+    ),
   getRentals: () => request<Rental[]>("/rentals/"),
   getReviews: () => request<Review[]>("/reviews/"),
+  createMember: (payload: {
+    full_name: string;
+    email: string;
+    city?: string;
+    bio?: string;
+    avatar_url?: string;
+    response_time?: string;
+  }) =>
+    request<Member>("/members/", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   createListing: (payload: {
     owner_id: number;
     title: string;

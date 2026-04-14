@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -7,11 +8,12 @@ from django.db.models import Avg, Count
 
 class Member(models.Model):
     full_name = models.CharField(max_length=120)
-    city = models.CharField(max_length=120)
+    email = models.EmailField(unique=True)
+    city = models.CharField(max_length=120, blank=True, default="")
     bio = models.TextField(blank=True)
     avatar_url = models.URLField(blank=True)
     response_time = models.CharField(max_length=60, default="within 1 hour")
-    joined_at = models.DateField()
+    joined_at = models.DateField(default=date.today)
 
     class Meta:
         ordering = ["full_name"]

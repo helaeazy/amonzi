@@ -19,8 +19,14 @@ def health_check(request):
 
 
 class MemberViewSet(viewsets.ModelViewSet):
-    queryset = Member.objects.all()
     serializer_class = MemberSerializer
+
+    def get_queryset(self):
+        queryset = Member.objects.all()
+        email = self.request.query_params.get("email")
+        if email:
+            queryset = queryset.filter(email__iexact=email)
+        return queryset
 
 
 class ListingViewSet(viewsets.ModelViewSet):

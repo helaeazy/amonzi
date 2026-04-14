@@ -1,7 +1,14 @@
-import { FormEvent, useDeferredValue, useState, useTransition } from "react";
+import { FormEvent, useDeferredValue, useEffect, useState, useTransition } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { NavLink, Route, Routes } from "react-router-dom";
+import type { User } from "firebase/auth";
 import { api } from "./api";
+import {
+  isFirebaseConfigured,
+  signInWithGoogle,
+  signOutFromGoogle,
+  subscribeToAuth,
+} from "./firebase";
 import type { Listing, Member, Rental } from "./types";
 
 const categories = [
@@ -39,7 +46,8 @@ const initialReviewForm = {
 
 function App() {
   const queryClient = useQueryClient();
-  const [activeMemberId, setActiveMemberId] = useState<number | null>(null);
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [search, setSearch] = useState("");
   const [listingForm, setListingForm] = useState(initialListingForm);
@@ -49,25 +57,60 @@ function App() {
   const [isPending, startTransition] = useTransition();
   const deferredSearch = useDeferredValue(search);
 
+  useEffect(() => {
+    return subscribeToAuth((user) => {
+      setAuthUser(user);
+      setAuthReady(true);
+    });
+  }, []);
+
+  const memberSyncQuery = useQuery({
+    queryKey: ["member-sync", authUser?.email],
+    enabled: Boolean(authUser?.email),
+    queryFn: async () => {
+      const email = authUser?.email;
+      if (!email) {
+        throw new Error("Missing Google account email.");
+      }
+      const existing = await api.getMembers(email);
+      if (existing.length > 0) {
+        return existing[0];
+      }
+      return api.createMember({
+        full_name: authUser?.displayName || email.split("@")[0],
+        email,
+        avatar_url: authUser?.photoURL || "",
+        city: "",
+        bio: "",
+        response_time: "within 1 hour",
+      });
+    },
+  });
+
   const overviewQuery = useQuery({
     queryKey: ["overview"],
     queryFn: api.getOverview,
+    enabled: Boolean(memberSyncQuery.data),
   });
   const listingsQuery = useQuery({
     queryKey: ["listings"],
     queryFn: api.getListings,
+    enabled: Boolean(memberSyncQuery.data),
   });
   const membersQuery = useQuery({
     queryKey: ["members"],
-    queryFn: api.getMembers,
+    queryFn: () => api.getMembers(),
+    enabled: Boolean(memberSyncQuery.data),
   });
   const rentalsQuery = useQuery({
     queryKey: ["rentals"],
     queryFn: api.getRentals,
+    enabled: Boolean(memberSyncQuery.data),
   });
   const reviewsQuery = useQuery({
     queryKey: ["reviews"],
     queryFn: api.getReviews,
+    enabled: Boolean(memberSyncQuery.data),
   });
 
   const listingMutation = useMutation({
@@ -110,14 +153,12 @@ function App() {
     },
   });
 
-  const members = membersQuery.data ?? [];
+  const activeMember = memberSyncQuery.data ?? null;
+  const resolvedActiveMemberId = activeMember?.id ?? null;
   const listings = listingsQuery.data ?? [];
   const rentals = rentalsQuery.data ?? [];
   const reviews = reviewsQuery.data ?? [];
   const overview = overviewQuery.data;
-  const resolvedActiveMemberId = activeMemberId ?? members[0]?.id ?? null;
-  const activeMember =
-    members.find((member) => member.id === resolvedActiveMemberId) ?? null;
 
   const filteredListings = listings.filter((listing) => {
     const matchesCategory =
@@ -188,25 +229,64 @@ function App() {
     });
   };
 
-  const shell = (
+  if (!isFirebaseConfigured()) {
+    return (
+      <AuthScreen
+        message="Add Firebase web config in Vite env vars to enable Google sign-in."
+        ready
+      />
+    );
+  }
+
+  if (!authReady) {
+    return <AuthScreen message="Checking Google sign-in..." ready={false} />;
+  }
+
+  if (!authUser) {
+    return (
+      <AuthScreen
+        message="Sign in with your Google account to use Amonzi."
+        onAction={() => void signInWithGoogle()}
+        actionLabel="Continue with Google"
+        ready
+      />
+    );
+  }
+
+  if (memberSyncQuery.isLoading) {
+    return <AuthScreen message="Preparing your Amonzi profile..." ready={false} />;
+  }
+
+  if (memberSyncQuery.error || !activeMember) {
+    return (
+      <AuthScreen
+        message="We could not create or load your member profile."
+        onAction={() => void signOutFromGoogle()}
+        actionLabel="Sign out"
+        ready
+      />
+    );
+  }
+
+  return (
     <div className="app-shell">
       <header className="topbar">
         <div>
           <p className="brand-mark">Amonzi</p>
+          <p className="hero-brand">Amonzi</p>
           <h1>Rent almost anything, fast.</h1>
         </div>
         <div className="acting-card">
-          <span>Acting as</span>
-          <select
-            value={resolvedActiveMemberId ?? ""}
-            onChange={(event) => setActiveMemberId(Number(event.target.value))}
+          <span>Signed in with Google</span>
+          <strong>{authUser.displayName || authUser.email}</strong>
+          <small>{authUser.email}</small>
+          <button
+            className="secondary-button"
+            onClick={() => void signOutFromGoogle()}
+            type="button"
           >
-            {members.map((member) => (
-              <option key={member.id} value={member.id}>
-                {member.full_name}
-              </option>
-            ))}
-          </select>
+            Sign out
+          </button>
         </div>
       </header>
 
@@ -287,8 +367,30 @@ function App() {
       {isPending ? <div className="ghost-chip">Updating filters…</div> : null}
     </div>
   );
+}
 
-  return shell;
+function AuthScreen(props: {
+  actionLabel?: string;
+  message: string;
+  onAction?: () => void;
+  ready: boolean;
+}) {
+  return (
+    <main className="auth-shell">
+      <section className="auth-card">
+        <p className="brand-mark">Amonzi</p>
+        <p className="hero-brand">Amonzi</p>
+        <h1>Google sign-in only.</h1>
+        <p className="lead">{props.message}</p>
+        {props.onAction && props.actionLabel ? (
+          <button className="primary-button" onClick={props.onAction} type="button">
+            {props.actionLabel}
+          </button>
+        ) : null}
+        {!props.ready ? <div className="ghost-chip">Please wait…</div> : null}
+      </section>
+    </main>
+  );
 }
 
 function ExploreScreen(props: {
@@ -355,7 +457,7 @@ function ExploreScreen(props: {
               <div
                 className="listing-image"
                 style={{
-                  backgroundImage: `linear-gradient(180deg, rgba(7, 12, 20, 0.12), rgba(7, 12, 20, 0.72)), url(${listing.image_url})`,
+                  backgroundImage: `linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.22)), url(${listing.image_url})`,
                 }}
               />
               <div className="listing-body">
@@ -366,13 +468,14 @@ function ExploreScreen(props: {
                 <h4>{listing.title}</h4>
                 <p>{listing.description}</p>
                 <div className="meta-row">
-                  <strong>€{listing.price_per_day}/day</strong>
-                  <span>Deposit €{listing.deposit}</span>
+                  <strong>EUR {listing.price_per_day}/day</strong>
+                  <span>Deposit EUR {listing.deposit}</span>
                 </div>
                 <div className="owner-row">
                   <span>{listing.owner.full_name}</span>
-                  <span>
-                    {listing.owner.score} score · {listing.owner.review_count} reviews
+                  <span className="rating-line">
+                    <StarRating score={listing.owner.score} />
+                    {listing.owner.review_count} reviews
                   </span>
                 </div>
               </div>
@@ -395,8 +498,10 @@ function ExploreScreen(props: {
               <h4>{member.full_name}</h4>
               <p>{member.bio}</p>
               <div className="meta-stack">
-                <span>{member.city}</span>
-                <span>{member.score} score</span>
+                <span>{member.city || "City not added yet"}</span>
+                <span className="rating-line">
+                  <StarRating score={member.score} />
+                </span>
                 <span>{member.response_time}</span>
               </div>
             </article>
@@ -519,7 +624,9 @@ function TripsScreen(props: {
   rentalBusy: boolean;
   reviewBusy: boolean;
 }) {
-  const myRentals = props.rentals.filter((rental) => rental.renter === props.activeMemberId);
+  const myRentals = props.rentals.filter(
+    (rental) => rental.renter === props.activeMemberId
+  );
 
   return (
     <main className="screen">
@@ -541,7 +648,7 @@ function TripsScreen(props: {
             <option value="">Choose listing</option>
             {props.listings.map((listing) => (
               <option key={listing.id} value={listing.id}>
-                {listing.title} · €{listing.price_per_day}/day
+                {listing.title} · EUR {listing.price_per_day}/day
               </option>
             ))}
           </select>
@@ -676,11 +783,18 @@ function ProfileScreen(props: {
         <div>
           <p className="eyebrow">Public profile</p>
           <h2>{props.activeMember.full_name}</h2>
-          <p className="lead">{props.activeMember.bio}</p>
+          <p className="lead">{props.activeMember.bio || "Your public bio appears here."}</p>
         </div>
       </section>
       <section className="stats-grid">
-        <StatCard label="Score" value={props.activeMember.score} />
+        <StatCard
+          label="Score"
+          value={
+            <span className="rating-line">
+              <StarRating score={props.activeMember.score} />
+            </span>
+          }
+        />
         <StatCard label="Reviews" value={props.activeMember.review_count} />
         <StatCard label="Listings" value={ownedListings.length} />
         <StatCard label="Rentals" value={rentalCount} />
@@ -688,14 +802,16 @@ function ProfileScreen(props: {
       <section className="surface">
         <div className="section-head">
           <h3>Your active inventory</h3>
-          <p>{props.activeMember.city}</p>
+          <p>{props.activeMember.city || "Add your city after sign-in"}</p>
         </div>
         <div className="timeline">
           {ownedListings.map((listing) => (
             <div className="timeline-card" key={listing.id}>
               <div>
                 <strong>{listing.title}</strong>
-                <p>€{listing.price_per_day}/day · {listing.category}</p>
+                <p>
+                  EUR {listing.price_per_day}/day · {listing.category}
+                </p>
               </div>
               <span className="status-pill live">{listing.status}</span>
             </div>
@@ -706,7 +822,21 @@ function ProfileScreen(props: {
   );
 }
 
-function StatCard(props: { label: string; value: number | string }) {
+function StarRating(props: { score: number | string }) {
+  const numericScore =
+    typeof props.score === "number" ? props.score : Number(props.score);
+  const rounded = Math.round(numericScore);
+
+  return (
+    <span className="stars" aria-label={`${numericScore} out of 5 stars`}>
+      {"★★★★★".slice(0, rounded)}
+      <span className="stars-muted">{"★★★★★".slice(rounded)}</span>
+      <strong>{numericScore.toFixed(1)}</strong>
+    </span>
+  );
+}
+
+function StatCard(props: { label: string; value: React.ReactNode }) {
   return (
     <article className="stat-card">
       <span>{props.label}</span>

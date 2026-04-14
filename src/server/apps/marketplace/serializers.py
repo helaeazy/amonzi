@@ -13,6 +13,7 @@ class MemberSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "full_name",
+            "email",
             "city",
             "bio",
             "avatar_url",

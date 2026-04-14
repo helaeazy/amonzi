@@ -5,8 +5,8 @@ from apps.marketplace.models import Listing, Member, Rental, Review
 
 @admin.register(Member)
 class MemberAdmin(admin.ModelAdmin):
-    list_display = ("full_name", "city", "response_time", "joined_at")
-    search_fields = ("full_name", "city")
+    list_display = ("full_name", "email", "city", "response_time", "joined_at")
+    search_fields = ("full_name", "email", "city")
 
 
 @admin.register(Listing)

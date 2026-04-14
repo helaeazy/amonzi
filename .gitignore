@@ -1,5 +1,6 @@
 .lexi/
 .env
+src/client/.env
 .venv/
 __pycache__/
 *.pyc
