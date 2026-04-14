@@ -1,0 +1,13 @@
+Metadata-Version: 2.4
+Name: amonzi
+Version: 0.1.0
+Summary: Amonzi Django and React starter
+Requires-Python: >=3.12
+Requires-Dist: Django==5.2.7
+Requires-Dist: djangorestframework==3.16.1
+Requires-Dist: django-cors-headers==4.9.0
+Requires-Dist: drf-spectacular==0.28.0
+Requires-Dist: psycopg[binary]>=3.2.0
+Requires-Dist: pytest==8.4.2
+Requires-Dist: pytest-django==4.11.1
+Requires-Dist: ruff==0.14.0

@@ -1,0 +1,34 @@
+[project]
+name = "amonzi"
+version = "0.1.0"
+description = "Amonzi Django and React starter"
+requires-python = ">=3.12"
+dependencies = [
+    "Django==5.2.7",
+    "djangorestframework==3.16.1",
+    "django-cors-headers==4.9.0",
+    "drf-spectacular==0.28.0",
+    "psycopg[binary]>=3.2.0",
+    "pytest==8.4.2",
+    "pytest-django==4.11.1",
+    "ruff==0.14.0",
+]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+src = ["src/server"]
+exclude = ["migrations"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "backend.settings"
+python_files = ["test_*.py", "*_test.py"]
+testpaths = ["src/server/tests"]
+pythonpath = ["src/server"]
