@@ -4,6 +4,7 @@ import { NavLink, Route, Routes } from "react-router-dom";
 import type { User } from "firebase/auth";
 import { api } from "./api";
 import {
+  isAuthDisabled,
   isFirebaseConfigured,
   signInWithGoogle,
   signOutFromGoogle,
@@ -90,27 +91,27 @@ function App() {
   const overviewQuery = useQuery({
     queryKey: ["overview"],
     queryFn: api.getOverview,
-    enabled: Boolean(memberSyncQuery.data),
+    enabled: isAuthDisabled() || Boolean(memberSyncQuery.data),
   });
   const listingsQuery = useQuery({
     queryKey: ["listings"],
     queryFn: api.getListings,
-    enabled: Boolean(memberSyncQuery.data),
+    enabled: isAuthDisabled() || Boolean(memberSyncQuery.data),
   });
   const membersQuery = useQuery({
     queryKey: ["members"],
     queryFn: () => api.getMembers(),
-    enabled: Boolean(memberSyncQuery.data),
+    enabled: isAuthDisabled() || Boolean(memberSyncQuery.data),
   });
   const rentalsQuery = useQuery({
     queryKey: ["rentals"],
     queryFn: api.getRentals,
-    enabled: Boolean(memberSyncQuery.data),
+    enabled: isAuthDisabled() || Boolean(memberSyncQuery.data),
   });
   const reviewsQuery = useQuery({
     queryKey: ["reviews"],
     queryFn: api.getReviews,
-    enabled: Boolean(memberSyncQuery.data),
+    enabled: isAuthDisabled() || Boolean(memberSyncQuery.data),
   });
 
   const listingMutation = useMutation({
@@ -159,6 +160,9 @@ function App() {
   const rentals = rentalsQuery.data ?? [];
   const reviews = reviewsQuery.data ?? [];
   const overview = overviewQuery.data;
+  const fallbackMember = membersQuery.data?.[0] ?? null;
+  const currentMember = isAuthDisabled() ? fallbackMember : activeMember;
+  const currentMemberId = currentMember?.id ?? null;
 
   const filteredListings = listings.filter((listing) => {
     const matchesCategory =
@@ -175,17 +179,17 @@ function App() {
   const reviewableRentals = rentals.filter(
     (rental) =>
       rental.status === "completed" &&
-      rental.renter === resolvedActiveMemberId &&
+      rental.renter === currentMemberId &&
       !reviews.some((review) => review.rental === rental.id)
   );
 
   const handleListingSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!resolvedActiveMemberId) {
+    if (!currentMemberId) {
       return;
     }
     listingMutation.mutate({
-      owner_id: resolvedActiveMemberId,
+      owner_id: currentMemberId,
       title: listingForm.title,
       description: listingForm.description,
       category: listingForm.category,
@@ -199,7 +203,7 @@ function App() {
 
   const handleRentalSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!resolvedActiveMemberId || !rentalForm.listing) {
+    if (!currentMemberId || !rentalForm.listing) {
       return;
     }
     const selectedListing = listings.find(
@@ -208,7 +212,7 @@ function App() {
     const totalPrice = selectedListing ? selectedListing.price_per_day : "0";
     rentalMutation.mutate({
       listing: Number(rentalForm.listing),
-      renter: resolvedActiveMemberId,
+      renter: currentMemberId,
       start_date: rentalForm.start_date,
       end_date: rentalForm.end_date,
       status: "requested",
@@ -218,18 +222,18 @@ function App() {
 
   const handleReviewSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!resolvedActiveMemberId || !reviewForm.rental) {
+    if (!currentMemberId || !reviewForm.rental) {
       return;
     }
     reviewMutation.mutate({
       rental: Number(reviewForm.rental),
-      author: resolvedActiveMemberId,
+      author: currentMemberId,
       rating: Number(reviewForm.rating),
       comment: reviewForm.comment,
     });
   };
 
-  if (!isFirebaseConfigured()) {
+  if (!isAuthDisabled() && !isFirebaseConfigured()) {
     return (
       <AuthScreen
         message="Add Firebase web config in Vite env vars to enable Google sign-in."
@@ -238,11 +242,11 @@ function App() {
     );
   }
 
-  if (!authReady) {
+  if (!isAuthDisabled() && !authReady) {
     return <AuthScreen message="Checking Google sign-in..." ready={false} />;
   }
 
-  if (!authUser) {
+  if (!isAuthDisabled() && !authUser) {
     return (
       <AuthScreen
         message="Sign in with your Google account to use Amonzi."
@@ -253,11 +257,11 @@ function App() {
     );
   }
 
-  if (memberSyncQuery.isLoading) {
+  if (!isAuthDisabled() && memberSyncQuery.isLoading) {
     return <AuthScreen message="Preparing your Amonzi profile..." ready={false} />;
   }
 
-  if (memberSyncQuery.error || !activeMember) {
+  if (!isAuthDisabled() && (memberSyncQuery.error || !activeMember)) {
     return (
       <AuthScreen
         message="We could not create or load your member profile."
@@ -277,16 +281,26 @@ function App() {
           <h1>Rent almost anything, fast.</h1>
         </div>
         <div className="acting-card">
-          <span>Signed in with Google</span>
-          <strong>{authUser.displayName || authUser.email}</strong>
-          <small>{authUser.email}</small>
-          <button
-            className="secondary-button"
-            onClick={() => void signOutFromGoogle()}
-            type="button"
-          >
-            Sign out
-          </button>
+          {isAuthDisabled() ? (
+            <>
+              <span>Auth disabled for now</span>
+              <strong>{currentMember?.full_name || "Demo member"}</strong>
+              <small>Set `VITE_DISABLE_AUTH=false` when Firebase is ready.</small>
+            </>
+          ) : (
+            <>
+              <span>Signed in with Google</span>
+              <strong>{authUser?.displayName || authUser?.email}</strong>
+              <small>{authUser?.email}</small>
+              <button
+                className="secondary-button"
+                onClick={() => void signOutFromGoogle()}
+                type="button"
+              >
+                Sign out
+              </button>
+            </>
+          )}
         </div>
       </header>
 
@@ -304,7 +318,7 @@ function App() {
           path="/"
           element={
             <ExploreScreen
-              activeMember={activeMember}
+              activeMember={currentMember}
               filteredListings={filteredListings}
               onCategoryChange={(category) =>
                 startTransition(() => setSelectedCategory(category))
@@ -331,7 +345,7 @@ function App() {
           path="/trips"
           element={
             <TripsScreen
-              activeMemberId={resolvedActiveMemberId}
+              activeMemberId={currentMemberId}
               listings={listings}
               rentalForm={rentalForm}
               rentals={rentals}
@@ -350,7 +364,7 @@ function App() {
           path="/profile"
           element={
             <ProfileScreen
-              activeMember={activeMember}
+              activeMember={currentMember}
               listings={listings}
               rentals={rentals}
             />

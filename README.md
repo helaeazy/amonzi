@@ -15,8 +15,8 @@ The frontend is built mobile-first so it works well in the browser on phones, ta
 make install
 ```
 
-For Google-only sign-in, add Firebase web config to `src/client/.env`.
-You can copy `src/client/template.env` and fill in the values from your Firebase project.
+For now you can keep auth disabled with `VITE_DISABLE_AUTH=true` in `src/client/.env`.
+When you want Google-only sign-in, set `VITE_DISABLE_AUTH=false` and fill in the Firebase web config from `src/client/template.env`.
 
 ## Development
 
