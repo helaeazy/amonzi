@@ -2,6 +2,7 @@ stages:
   - quality
   - test
   - build
+  - deploy
 
 workflow:
   rules:
@@ -116,3 +117,79 @@ client-build:
     paths:
       - src/client/dist/
     expire_in: 7 days
+
+# ── Shared deploy template ──────────────────────────────────────────────────
+.deploy-template:
+  image: python:3.12-slim
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends openssh-client rsync
+    - mkdir -p ~/.ssh
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
+    - chmod 600 ~/.ssh/id_ed25519
+    - ssh-keyscan -p 222 www697.your-server.de >> ~/.ssh/known_hosts
+  script:
+    - |
+      ssh -p 222 afp9vy@www697.your-server.de "
+        set -e
+        cd $DEPLOY_PATH
+        git fetch origin
+        git checkout $CI_COMMIT_SHA
+
+        # Install/update Python deps
+        export PATH=\"\$HOME/.local/bin:\$PATH\"
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        uv sync --frozen --python 3.12
+
+        # Run DB migrations
+        export POSTGRES_DB=$POSTGRES_DB
+        export POSTGRES_USER=$POSTGRES_USER
+        export POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+        export POSTGRES_HOST=$POSTGRES_HOST
+        export POSTGRES_PORT=${POSTGRES_PORT:-5432}
+        uv run python src/server/manage.py migrate --noinput
+
+        # Collect static files
+        uv run python src/server/manage.py collectstatic --noinput
+
+        # Restart app (adjust to your process manager)
+        systemctl restart amonzi-$DEPLOY_ENV 2>/dev/null || \
+          pkill -HUP -f 'gunicorn.*amonzi' || true
+      "
+    - rsync -az -e "ssh -p 222" src/client/dist/ afp9vy@www697.your-server.de:$STATIC_PATH
+
+# ── Dev deploy — auto on dev/develop branch ─────────────────────────────────
+deploy-dev:
+  stage: deploy
+  extends: .deploy-template
+  variables:
+    DEPLOY_ENV: dev
+    DEPLOY_PATH: /usr/local/amonzi-dev
+    STATIC_PATH: /usr/local/amonzi-dev/public/
+  environment:
+    name: dev
+    url: https://dev.amonzi.com
+  needs:
+    - client-build
+    - server-test
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: on_success
+
+# ── Prod deploy — manual acceptance on main ──────────────────────────────────
+deploy-prod:
+  stage: deploy
+  extends: .deploy-template
+  variables:
+    DEPLOY_ENV: prod
+    DEPLOY_PATH: /usr/local/amonzi
+    STATIC_PATH: /usr/local/amonzi/public/
+  environment:
+    name: production
+    url: https://amonzi.com
+  needs:
+    - client-build
+    - server-test
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+      allow_failure: false
