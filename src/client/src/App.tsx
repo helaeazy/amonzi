@@ -1,5 +1,5 @@
 import { FormEvent, useRef, useDeferredValue, useEffect, useState, useTransition } from "react";
-import { Search, LayoutList, MessageSquare, User as UserIcon, Globe, ChevronLeft, ChevronRight, MoreHorizontal, LogOut, Eye, MousePointerClick, Share2, Plus, Trash2, X } from "lucide-react";
+import { Search, LayoutList, MessageSquare, User as UserIcon, Globe, ChevronLeft, ChevronRight, MoreHorizontal, LogOut, Eye, Plus, Trash2, X, MapPin, Shield, CalendarDays, Repeat } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import type { User } from "firebase/auth";
@@ -81,7 +81,7 @@ const en = {
   modal: {
     perDay: "/ day", deposit: "Deposit", owner: "Owner", memberSince: "Member since",
     responseTime: "Response time", noReviews: "No reviews yet.", reviews: "Reviews",
-    close: "Close", listed: "Listed",
+    close: "Close", listed: "Listed", messageOwner: "Message owner",
   },
   offers: { title: "Offers", subtitle: "Messages and rental requests from other members.", empty: "No offers yet. This is where incoming rental requests and messages will appear." },
   profile: {
@@ -126,7 +126,7 @@ const lv: typeof en = {
   modal: {
     perDay: "/ dienā", deposit: "Depozīts", owner: "Īpašnieks", memberSince: "Dalībnieks kopš",
     responseTime: "Atbildes laiks", noReviews: "Pagaidām nav atsauksmju.", reviews: "Atsauksmes",
-    close: "Aizvērt", listed: "Publicēts",
+    close: "Aizvērt", listed: "Publicēts", messageOwner: "Rakstīt īpašniekam",
   },
   offers: { title: "Piedāvājumi", subtitle: "Ziņojumi un nomas pieprasījumi no citiem lietotājiem.", empty: "Pagaidām nav piedāvājumu. Šeit parādīsies ienākošie nomas pieprasījumi." },
   profile: {
@@ -143,13 +143,15 @@ function App() {
   const queryClient = useQueryClient();
   const [authUser, setAuthUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedCity, setSelectedCity] = useState("all");
   const [sortOrder, setSortOrder] = useState("newest");
   const [search, setSearch] = useState("");
   const [listingForm, setListingForm] = useState(initialListingForm);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [rentalForm, setRentalForm] = useState(initialRentalForm);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [reviewForm, setReviewForm] = useState(initialReviewForm);
   const [notice, setNotice] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -160,6 +162,7 @@ function App() {
   });
   const t = lang === "lv" ? lv : en;
   const tRef = useRef(t);
+  // eslint-disable-next-line react-hooks/refs
   tRef.current = t;
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const avatarRef = useRef<HTMLDivElement>(null);
@@ -280,6 +283,7 @@ function App() {
     },
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const rentalMutation = useMutation({
     mutationFn: api.createRental,
     onSuccess: async () => {
@@ -292,6 +296,7 @@ function App() {
     },
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const reviewMutation = useMutation({
     mutationFn: api.createReview,
     onSuccess: async () => {
@@ -308,7 +313,6 @@ function App() {
   });
 
   const activeMember = memberSyncQuery.data ?? null;
-  const resolvedActiveMemberId = activeMember?.id ?? null;
   const listings = listingsQuery.data ?? [];
   const rentals = rentalsQuery.data ?? [];
   const reviews = reviewsQuery.data ?? [];
@@ -344,13 +348,6 @@ function App() {
       return Date.parse(right.created_at) - Date.parse(left.created_at);
     });
 
-  const reviewableRentals = rentals.filter(
-    (rental) =>
-      rental.status === "completed" &&
-      rental.renter === currentMemberId &&
-      !reviews.some((review) => review.rental === rental.id)
-  );
-
   const handleListingSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!currentMemberId) {
@@ -369,48 +366,20 @@ function App() {
     });
   };
 
-  const handleRentalSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!currentMemberId || !rentalForm.listing) {
-      return;
-    }
-    const selectedListing = listings.find(
-      (listing) => listing.id === Number(rentalForm.listing)
-    );
-    const totalPrice = selectedListing ? selectedListing.price_per_day : "0";
-    rentalMutation.mutate({
-      listing: Number(rentalForm.listing),
-      renter: currentMemberId,
-      start_date: rentalForm.start_date,
-      end_date: rentalForm.end_date,
-      status: "requested",
-      total_price: totalPrice,
-    });
+  const handleMessageOwner = (listing: Listing) => {
+    setNotice(`Open conversation with ${listing.owner.full_name} in Offers.`);
+    navigate("/app/offers");
   };
-
-  const handleReviewSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!currentMemberId || !reviewForm.rental) {
-      return;
-    }
-    reviewMutation.mutate({
-      rental: Number(reviewForm.rental),
-      author: currentMemberId,
-      rating: Number(reviewForm.rating),
-      comment: reviewForm.comment,
-    });
-  };
-
-  if (isHomeRoute && authReady && authUser) {
-    return <Navigate replace to="/app" />;
-  }
 
   if (isHomeRoute) {
     return (
       <HomeScreen
         overview={overview}
+        authReady={authReady}
+        authUser={authUser}
         canUseGoogleSignIn={!isAuthDisabled() && isFirebaseConfigured()}
         onGoogleSignIn={() => void signInWithGoogle()}
+        onSignOut={() => void signOutFromGoogle()}
       />
     );
   }
@@ -549,7 +518,9 @@ function App() {
                 activeMember={currentMember}
                 cityOptions={cityOptions}
                 filteredListings={filteredListings}
+                rentals={rentals}
                 reviews={reviews}
+                onMessageOwner={handleMessageOwner}
                 onCategoryChange={(category) =>
                   startTransition(() => setSelectedCategory(category))
                 }
@@ -590,7 +561,7 @@ function App() {
               t={t}
             />
           } />
-          <Route path="/app/offers" element={<OffersScreen activeMember={currentMember} t={t} />} />
+          <Route path="/app/offers" element={<OffersScreen activeMember={currentMember} listings={listings} rentals={rentals} t={t} />} />
           <Route path="/app/settings" element={<SettingsScreen activeMember={currentMember} lang={lang} onLangChange={(l) => { setLang(l); localStorage.setItem("lang", l); }} t={t} />} />
           <Route
             path="/app/profile"
@@ -634,41 +605,68 @@ function App() {
 
 function HomeScreen(props: {
   overview: Awaited<ReturnType<typeof api.getOverview>> | undefined;
+  authReady: boolean;
+  authUser: User | null;
   canUseGoogleSignIn: boolean;
   onGoogleSignIn: () => void;
+  onSignOut: () => void;
 }) {
+  const isSignedIn = Boolean(props.authUser);
+
   return (
     <main className="home-shell">
-      <header className="home-header">
-        <Link className="home-logo" to="/">
+      <header className="app-header home-topbar">
+        <Link className="app-header-logo" to="/app">
           Amonzi
         </Link>
         <div className="home-header-actions">
-          {props.canUseGoogleSignIn ? (
-            <button className="secondary-button" onClick={props.onGoogleSignIn} type="button">
-              Pieslēgties
-            </button>
+          {isSignedIn ? (
+            <>
+              <Link className="secondary-button" to="/app">
+                Skatīt sludinājumus
+              </Link>
+              <button className="secondary-button" onClick={props.onSignOut} type="button">
+                Izrakstīties
+              </button>
+            </>
+          ) : props.canUseGoogleSignIn ? (
+            <>
+              <button className="secondary-button" onClick={props.onGoogleSignIn} type="button">
+                Pieslēgties
+              </button>
+              <Link className="primary-button" to="/app">
+                Atvērt platformu
+              </Link>
+            </>
           ) : (
-            <Link className="secondary-button" to="/app">
-              Pieslēgties
-            </Link>
+            <>
+              <span className="tag">Auth disabled</span>
+              <Link className="primary-button" to="/app">
+                Atvērt platformu
+              </Link>
+            </>
           )}
-          <Link className="primary-button" to="/app">
-            Ieiet platformā
-          </Link>
-          <Link className="secondary-button" to="/app/profile">
-            Profils
-          </Link>
         </div>
       </header>
 
-      <section className="home-hero">
+      <section className="home-login-card">
         <div className="home-copy">
           <p className="brand-mark">Amonzi</p>
           <h1>Redzi, gribi, nomā.</h1>
           <p className="lead">Vienkārša noma. Ātra ieeja. Skaidri sludinājumi.</p>
+          <p className="home-status-line">
+            {isSignedIn
+              ? `Pieslēdzies kā ${props.authUser?.displayName || props.authUser?.email}.`
+              : props.authReady
+                ? "Ienāc ar Google un uzreiz atver sludinājumus, pieprasījumus un profilu."
+                : "Pārbauda pieteikšanos..."}
+          </p>
           <div className="home-actions">
-            {props.canUseGoogleSignIn ? (
+            {isSignedIn ? (
+              <Link className="primary-button" to="/app">
+                Doties uz sludinājumiem
+              </Link>
+            ) : props.canUseGoogleSignIn ? (
               <button className="primary-button" onClick={props.onGoogleSignIn} type="button">
                 Ieiet ar Google
               </button>
@@ -677,143 +675,65 @@ function HomeScreen(props: {
                 Atvērt platformu
               </Link>
             )}
-            <a className="secondary-button" href="#ka-tas-strada">
-              Kā tas strādā
-            </a>
-          </div>
-        </div>
-        <div className="home-panel">
-          <div className="home-stat">
-            <span>Ātri</span>
-            <strong>Atrodi vajadzīgo bez liekiem soļiem</strong>
-          </div>
-          <div className="home-stat">
-            <span>Vienkārši</span>
-            <strong>Ieeja, sludinājumi un noma vienā vietā</strong>
-          </div>
-          <div className="home-stat">
-            <span>Uzticami</span>
-            <strong>Vērtējumi un atsauksmes palīdz izvēlēties</strong>
+            <Link className="secondary-button" to="/app">
+              Ieiet platformā
+            </Link>
           </div>
         </div>
       </section>
 
-      <section className="home-strip" id="ka-tas-strada">
-        <article className="home-mini-card">
+      <section className="home-grid">
+        <article className="home-step">
+          <span className="tag">1</span>
           <strong>Pieslēdzies</strong>
-          <p>Ar Google un sāc uzreiz.</p>
+          <p>Ieeja ar Google un tava profila sagatavošana notiek vienā plūsmā.</p>
         </article>
-        <article className="home-mini-card">
-          <strong>Atrodi</strong>
-          <p>Pārlūko pēc cenas, pilsētas un kategorijas.</p>
+        <article className="home-step">
+          <span className="tag">2</span>
+          <strong>Atrodi sludinājumus</strong>
+          <p>Meklē pēc pilsētas, kategorijas un cenas, pēc tam atver sev vajadzīgo ierakstu.</p>
         </article>
-        <article className="home-mini-card">
-          <strong>Nomā</strong>
-          <p>Nosūti pieprasījumu un pārvaldi visu vienuviet.</p>
+        <article className="home-step">
+          <span className="tag">3</span>
+          <strong>Nosūti pieprasījumu</strong>
+          <p>Pārvaldi nomas pieprasījumus, sarunas un savus sludinājumus vienā vietā.</p>
         </article>
       </section>
 
-      <section className="home-preview-block">
-        <div className="section-head">
-          <h2>Platformas skati</h2>
-          <p>Īss priekšskats, kā izskatīsies platforma.</p>
-        </div>
-        <div className="home-preview-grid">
-          <article className="home-preview-card">
-            <div className="home-preview-bar">
-              <span />
-              <span />
-              <span />
-            </div>
-            <div className="home-preview-content">
-              <strong>Explore skats</strong>
-              <p>Meklēšana, kategorijas, pilsētas filtrs un sludinājumu saraksts.</p>
-              <div className="home-preview-lines">
-                <span />
-                <span />
-                <span />
-              </div>
-            </div>
-          </article>
-
-          <article className="home-preview-card">
-            <div className="home-preview-bar">
-              <span />
-              <span />
-              <span />
-            </div>
-            <div className="home-preview-content">
-              <strong>Post skats</strong>
-              <p>Forma jaunam sludinājumam ar virsrakstu, cenu, attēlu un kategoriju.</p>
-              <div className="home-preview-lines">
-                <span />
-                <span />
-                <span />
-              </div>
-            </div>
-          </article>
-
-          <article className="home-preview-card">
-            <div className="home-preview-bar">
-              <span />
-              <span />
-              <span />
-            </div>
-            <div className="home-preview-content">
-              <strong>Trips skats</strong>
-              <p>Nomas pieprasījumi, datumi, statusi un atsauksmju sadaļa vienuviet.</p>
-              <div className="home-preview-lines">
-                <span />
-                <span />
-                <span />
-              </div>
-            </div>
-          </article>
-        </div>
+      <section className="home-grid">
+        <article className="home-step">
+          <span className="tag">Explore</span>
+          <strong>Galvenā lapa ar visiem sludinājumiem</strong>
+          <p>Tieši tur atrodas saraksts ar visām pieejamajām precēm un filtriem.</p>
+        </article>
+        <article className="home-step">
+          <span className="tag">Offers</span>
+          <strong>Pārskatāmas vienošanās</strong>
+          <p>Ziņas un nomas vienošanās paliek strukturētas, nevis izkaisītas pa dažādām vietām.</p>
+        </article>
+        <article className="home-step">
+          <span className="tag">Profile</span>
+          <strong>Uzticība un atsauksmes</strong>
+          <p>Profils, vērtējumi un sludinājumu vēsture palīdz saprast, ar ko ir droši sadarboties.</p>
+        </article>
       </section>
 
-      <section className="home-preview-block">
-        <div className="section-head">
-          <h2>Sludinājumu karuselis</h2>
-          <p>Piemēri tam, ko lietotājs redzēs uzreiz.</p>
-        </div>
-        <div className="home-carousel">
-          {(props.overview?.featured_listings ?? []).map((listing) => (
-            <article className="home-carousel-card" key={listing.id}>
-              <div
-                className="home-carousel-image"
-                style={{ backgroundImage: `url(${listing.image_url})` }}
-              />
-              <div className="home-carousel-body">
-                <span className="tag">{listing.category}</span>
-                <strong>{listing.title}</strong>
-                <p>{listing.city}</p>
-                <strong>EUR {listing.price_per_day}/dienā</strong>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="home-preview-block">
-        <div className="section-head">
-          <h2>Atsauksmes</h2>
-          <p>Ko lietotāji redzēs pirms izvēles.</p>
-        </div>
-        <div className="home-carousel">
-          {(props.overview?.recent_reviews ?? []).map((review) => (
-            <article className="home-carousel-card review-card" key={review.id}>
-              <div className="home-carousel-body">
-                <span className="tag">Atsauksme</span>
-                <strong>{review.reviewed_member_name}</strong>
-                <span className="rating-line">
-                  <StarRating score={review.rating} />
-                </span>
-                <p>{review.comment}</p>
-              </div>
-            </article>
-          ))}
-        </div>
+      <section className="home-grid">
+        <article className="home-step">
+          <span>Sludinājumi</span>
+          <strong>{props.overview?.stats.live_listings ?? 0}</strong>
+          <p>Aktīvi ieraksti platformā šobrīd.</p>
+        </article>
+        <article className="home-step">
+          <span>Nomas</span>
+          <strong>{props.overview?.stats.completed_rentals ?? 0}</strong>
+          <p>Kopējais pieprasījumu un nomu skaits.</p>
+        </article>
+        <article className="home-step">
+          <span>Atsauksmes</span>
+          <strong>{props.overview?.stats.reviews ?? 0}</strong>
+          <p>Atsauksmes, kas palīdz izvēlēties pareizo īpašnieku.</p>
+        </article>
       </section>
     </main>
   );
@@ -847,7 +767,9 @@ function ExploreScreen(props: {
   activeMember: Member | null;
   cityOptions: string[];
   filteredListings: Listing[];
+  rentals: Rental[];
   reviews: Review[];
+  onMessageOwner: (listing: Listing) => void;
   onCategoryChange: (category: string) => void;
   onCityChange: (city: string) => void;
   onSearchChange: (value: string) => void;
@@ -867,6 +789,7 @@ function ExploreScreen(props: {
   const safePage = Math.min(page, totalPages);
   const paginated = props.filteredListings.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setPage(1); }, [props.filteredListings.length, props.selectedCategory, props.selectedCity, props.sortOrder, props.search]);
   useEffect(() => {
     props.onModalOpenChange(Boolean(selectedListing));
@@ -942,16 +865,23 @@ function ExploreScreen(props: {
                 }}
               />
               <div className="listing-body">
-                <div className="listing-top">
-                  <span className="tag">{props.t.explore.categories[listing.category as keyof typeof props.t.explore.categories] ?? listing.category}</span>
-                  <span className="tag muted">{listing.city}</span>
+                <div className="listing-head-block">
+                  <div className="listing-title-row">
+                    <div className="listing-title-copy">
+                      <h4>{listing.title}</h4>
+                      <div className="listing-rating-value">
+                        <StarRating score={listing.owner.score} />
+                        <span>({listing.owner.review_count})</span>
+                      </div>
+                    </div>
+                    <strong className="listing-price-top">EUR {listing.price_per_day}/{props.t.common.day}</strong>
+                  </div>
+                  <div className="listing-top-tags">
+                    <span className="tag">{props.t.explore.categories[listing.category as keyof typeof props.t.explore.categories] ?? listing.category}</span>
+                    <span className="tag muted">{listing.city}</span>
+                  </div>
                 </div>
-                <h4>{listing.title}</h4>
                 <p>{listing.description}</p>
-                <div className="meta-row">
-                  <strong>EUR {listing.price_per_day}/{props.t.common.day}</strong>
-                  <span>{props.t.common.deposit} EUR {listing.deposit}</span>
-                </div>
                 <div className="owner-preview">
                   <div className="owner-preview-head">
                     <div className="avatar-ring owner-preview-avatar">
@@ -967,13 +897,6 @@ function ExploreScreen(props: {
                     <span>{props.t.modal.responseTime}: {listing.owner.response_time}</span>
                     <span>{props.t.explore.memberSinceShort} {new Date(listing.owner.joined_at).getFullYear()}</span>
                   </div>
-                </div>
-                <div className="owner-row">
-                  <span>{listing.owner.full_name}</span>
-                  <span className="rating-line">
-                    <StarRating score={listing.owner.score} />
-                    {listing.owner.review_count} {props.t.common.reviews}
-                  </span>
                 </div>
               </div>
             </article>
@@ -1019,7 +942,9 @@ function ExploreScreen(props: {
       {selectedListing && (
         <ListingModal
           listing={selectedListing}
+          rentalCount={props.rentals.filter((rental) => rental.listing === selectedListing.id).length}
           reviews={props.reviews.filter((r) => r.listing === selectedListing.id)}
+          onMessageOwner={props.onMessageOwner}
           t={props.t}
           onClose={() => setSelectedListing(null)}
         />
@@ -1126,6 +1051,7 @@ function PostScreen(props: {
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function TripsScreen(props: {
   activeMemberId: number | null;
   listings: Listing[];
@@ -1491,7 +1417,337 @@ function MyPostsScreen(props: {
   );
 }
 
-function OffersScreen(props: { activeMember: Member | null; t: typeof en }) {
+const OFFER_THREADS_STORAGE_KEY = "amonzi-offer-threads-v1";
+
+type OfferDealState = "pending" | "accepted" | "declined";
+
+type OfferMessage = {
+  id: string;
+  sender: "me" | "them" | "system";
+  kind: "text" | "deal";
+  text?: string;
+  created_at: string;
+  deal?: {
+    title: string;
+    amount: string;
+    deposit: string;
+    dateRange: string;
+    note: string;
+    state: OfferDealState;
+  };
+};
+
+type OfferThread = {
+  messages: OfferMessage[];
+};
+
+function describeRentalStatus(status: Rental["status"]) {
+  if (status === "completed") return "Completed rental";
+  if (status === "active") return "Rental is active";
+  if (status === "approved") return "Approved and ready";
+  if (status === "cancelled") return "Rental was cancelled";
+  return "New rental request";
+}
+
+function createOfferMessage(message: Omit<OfferMessage, "id" | "created_at"> & { created_at?: string }): OfferMessage {
+  return {
+    ...message,
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    created_at: message.created_at ?? new Date().toISOString(),
+  };
+}
+
+function buildSeedMessages(args: {
+  counterpartName: string;
+  dateRange: string;
+  isOwner: boolean;
+  listingTitle: string;
+  rental: Rental;
+}): OfferMessage[] {
+  const renterInquiry = createOfferMessage({
+    sender: args.isOwner ? "them" : "me",
+    kind: "text",
+    text: `Hi, I want to rent "${args.listingTitle}" for ${args.dateRange}. Is it available?`,
+    created_at: args.rental.created_at,
+  });
+
+  const ownerReply = createOfferMessage({
+    sender: args.isOwner ? "me" : "them",
+    kind: "text",
+    text:
+      args.rental.status === "requested"
+        ? "Yes, it is available. I sent the rental terms below."
+        : args.rental.status === "cancelled"
+          ? "This rental was cancelled, but we can discuss new dates if needed."
+          : `Status update: ${describeRentalStatus(args.rental.status)}.`,
+    created_at: new Date(Date.parse(args.rental.created_at) + 60_000).toISOString(),
+  });
+
+  const dealState: OfferDealState =
+    args.rental.status === "cancelled"
+      ? "declined"
+      : args.rental.status === "approved" ||
+          args.rental.status === "active" ||
+          args.rental.status === "completed"
+        ? "accepted"
+        : "pending";
+
+  const dealMessage = createOfferMessage({
+    sender: args.isOwner ? "me" : "them",
+    kind: "deal",
+    created_at: new Date(Date.parse(args.rental.created_at) + 120_000).toISOString(),
+    deal: {
+      title: "Rental agreement",
+      amount: args.rental.total_price,
+      deposit: "Flexible",
+      dateRange: args.dateRange,
+      note:
+        args.rental.status === "requested"
+          ? "If this looks good, accept the agreement and we can lock it in."
+          : "Agreement details for this rental.",
+      state: dealState,
+    },
+  });
+
+  return [renterInquiry, ownerReply, dealMessage];
+}
+
+function formatMessageTime(value: string) {
+  return new Date(value).toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getThreadPreview(message: OfferMessage | undefined, counterpartName: string) {
+  if (!message) return "No messages yet.";
+  if (message.kind === "deal") {
+    if (message.sender === "me") return "You sent an agreement";
+    if (message.sender === "them") return `${counterpartName} sent an agreement`;
+    return "Agreement updated";
+  }
+  return message.text ?? "No messages yet.";
+}
+
+function OffersScreen(props: {
+  activeMember: Member | null;
+  listings: Listing[];
+  rentals: Rental[];
+  t: typeof en;
+}) {
+  const currentMemberId = props.activeMember?.id ?? null;
+  const baseConversations = props.rentals
+    .map((rental) => {
+      const listing = props.listings.find((item) => item.id === rental.listing);
+      if (!listing || !currentMemberId) {
+        return null;
+      }
+
+      const isOwner = listing.owner.id === currentMemberId;
+      const isRenter = rental.renter === currentMemberId;
+      if (!isOwner && !isRenter) {
+        return null;
+      }
+
+      return {
+        id: rental.id,
+        counterpartName: isOwner ? rental.renter_name : listing.owner.full_name,
+        counterpartAvatar: isOwner ? "" : listing.owner.avatar_url,
+        dateRange: `${rental.start_date} to ${rental.end_date}`,
+        isOwner,
+        listingTitle: rental.listing_title,
+        listingId: rental.listing,
+        status: rental.status,
+        statusLabel: describeRentalStatus(rental.status),
+        totalPrice: rental.total_price,
+        updatedAt: rental.created_at,
+        rental,
+      };
+    })
+    .filter((conversation): conversation is NonNullable<typeof conversation> => Boolean(conversation));
+
+  const [searchValue, setSearchValue] = useState("");
+  const [composerValue, setComposerValue] = useState("");
+  const [showDealForm, setShowDealForm] = useState(false);
+  const [dealForm, setDealForm] = useState({
+    title: "Rental agreement",
+    amount: "",
+    deposit: "",
+    note: "",
+  });
+  const [threadState, setThreadState] = useState<Record<number, OfferThread>>(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const stored = window.localStorage.getItem(OFFER_THREADS_STORAGE_KEY);
+      if (!stored) return {};
+      return JSON.parse(stored) as Record<number, OfferThread>;
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setThreadState((current) => {
+      const next: Record<number, OfferThread> = {};
+      let changed = false;
+      baseConversations.forEach((conversation) => {
+        if (!current[conversation.id]) {
+          changed = true;
+        }
+        next[conversation.id] =
+          current[conversation.id] ?? {
+            messages: buildSeedMessages({
+              counterpartName: conversation.counterpartName,
+              dateRange: conversation.dateRange,
+              isOwner: conversation.isOwner,
+              listingTitle: conversation.listingTitle,
+              rental: conversation.rental,
+            }),
+          };
+      });
+      if (Object.keys(current).length !== Object.keys(next).length) {
+        changed = true;
+      }
+      return changed ? next : current;
+    });
+  }, [currentMemberId, props.listings, props.rentals]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(OFFER_THREADS_STORAGE_KEY, JSON.stringify(threadState));
+  }, [threadState]);
+
+  const conversations = baseConversations
+    .map((conversation) => {
+      const messages = threadState[conversation.id]?.messages ?? [];
+      const lastMessage = messages[messages.length - 1];
+      const pendingIncomingDeals = messages.filter(
+        (message) =>
+          message.kind === "deal" &&
+          message.sender === "them" &&
+          message.deal?.state === "pending"
+      ).length;
+
+      return {
+        ...conversation,
+        lastMessage,
+        lastPreview: getThreadPreview(lastMessage, conversation.counterpartName),
+        messages,
+        pendingIncomingDeals,
+        updatedAt: lastMessage?.created_at ?? conversation.updatedAt,
+      };
+    })
+    .filter((conversation) => {
+      const query = searchValue.trim().toLowerCase();
+      if (!query) return true;
+      return `${conversation.counterpartName} ${conversation.listingTitle}`.toLowerCase().includes(query);
+    })
+    .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
+
+  const [activeConversationId, setActiveConversationId] = useState<number | null>(
+    conversations[0]?.id ?? null
+  );
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setActiveConversationId((current) => {
+      if (current && conversations.some((conversation) => conversation.id === current)) {
+        return current;
+      }
+      return conversations[0]?.id ?? null;
+    });
+  }, [conversations]);
+
+  const activeConversation =
+    conversations.find((conversation) => conversation.id === activeConversationId) ??
+    conversations[0] ??
+    null;
+
+  useEffect(() => {
+    if (!activeConversation) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDealForm({
+      title: "Rental agreement",
+      amount: activeConversation.totalPrice,
+      deposit: "",
+      note: "",
+    });
+    setComposerValue("");
+    setShowDealForm(false);
+  }, [activeConversationId]);
+
+  const updateConversationMessages = (
+    conversationId: number,
+    updater: (messages: OfferMessage[]) => OfferMessage[]
+  ) => {
+    setThreadState((current) => {
+      const existing = current[conversationId]?.messages ?? [];
+      return {
+        ...current,
+        [conversationId]: {
+          messages: updater(existing),
+        },
+      };
+    });
+  };
+
+  const sendMessage = () => {
+    if (!activeConversation || !composerValue.trim()) return;
+    const messageText = composerValue.trim();
+    updateConversationMessages(activeConversation.id, (messages) => [
+      ...messages,
+      createOfferMessage({
+        sender: "me",
+        kind: "text",
+        text: messageText,
+      }),
+    ]);
+    setComposerValue("");
+  };
+
+  const sendDeal = () => {
+    if (!activeConversation || !dealForm.amount.trim()) return;
+    updateConversationMessages(activeConversation.id, (messages) => [
+      ...messages,
+      createOfferMessage({
+        sender: "me",
+        kind: "deal",
+        deal: {
+          title: dealForm.title.trim() || "Rental agreement",
+          amount: dealForm.amount.trim(),
+          deposit: dealForm.deposit.trim() || "Not set",
+          dateRange: activeConversation.dateRange,
+          note: dealForm.note.trim(),
+          state: "pending",
+        },
+      }),
+    ]);
+    setShowDealForm(false);
+    setDealForm((current) => ({ ...current, note: "" }));
+  };
+
+  const respondToDeal = (messageId: string, nextState: OfferDealState) => {
+    if (!activeConversation) return;
+    updateConversationMessages(activeConversation.id, (messages) => [
+      ...messages.map((message) =>
+        message.id === messageId && message.kind === "deal" && message.deal
+          ? { ...message, deal: { ...message.deal, state: nextState } }
+          : message
+      ),
+      createOfferMessage({
+        sender: "system",
+        kind: "text",
+        text:
+          nextState === "accepted"
+            ? "Agreement accepted. You can now continue with final pickup details."
+            : "Agreement declined. Send a new version if you want to renegotiate.",
+      }),
+    ]);
+  };
+
   return (
     <main className="screen">
       <section className="surface">
@@ -1499,7 +1755,233 @@ function OffersScreen(props: { activeMember: Member | null; t: typeof en }) {
           <h3>{props.t.offers.title}</h3>
           <p>{props.t.offers.subtitle}</p>
         </div>
-        <div className="notice">{props.t.offers.empty}</div>
+        {conversations.length === 0 ? (
+          <div className="notice">{props.t.offers.empty}</div>
+        ) : (
+          <div className="offers-layout offers-page">
+            <aside className="offers-sidebar">
+              <div className="offers-search">
+                <input
+                  onChange={(event) => setSearchValue(event.target.value)}
+                  placeholder="Search conversations"
+                  value={searchValue}
+                />
+              </div>
+
+              <div className="offers-list" aria-label="Past conversations">
+                {conversations.map((conversation) => (
+                  <button
+                    key={conversation.id}
+                    className={`offers-thread${conversation.id === activeConversation?.id ? " active" : ""}`}
+                    onClick={() => setActiveConversationId(conversation.id)}
+                    type="button"
+                  >
+                    <div className="offers-thread-head">
+                      <div className="avatar-ring offers-avatar">
+                        {conversation.counterpartAvatar ? (
+                          <img alt={conversation.counterpartName} src={conversation.counterpartAvatar} />
+                        ) : (
+                          <span>{conversation.counterpartName.charAt(0)}</span>
+                        )}
+                      </div>
+                      <div className="offers-thread-copy">
+                        <div className="offers-thread-row">
+                          <strong>{conversation.counterpartName}</strong>
+                          <small>{new Date(conversation.updatedAt).toLocaleDateString()}</small>
+                        </div>
+                        <span>{conversation.listingTitle}</span>
+                        <p>{conversation.lastPreview}</p>
+                        <div className="offers-thread-meta">
+                          <span className={`status-pill ${conversation.status}`}>{conversation.status}</span>
+                          {conversation.pendingIncomingDeals > 0 && (
+                            <span className="offers-unread-badge">{conversation.pendingIncomingDeals} pending</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </aside>
+
+            {activeConversation && (
+              <article className="offers-panel">
+                <div className="offers-panel-head">
+                  <div className="offers-panel-head-main">
+                    <div className="avatar-ring offers-avatar offers-avatar-lg">
+                      {activeConversation.counterpartAvatar ? (
+                        <img alt={activeConversation.counterpartName} src={activeConversation.counterpartAvatar} />
+                      ) : (
+                        <span>{activeConversation.counterpartName.charAt(0)}</span>
+                      )}
+                    </div>
+                    <div>
+                      <p className="modal-section-label">Conversation</p>
+                      <h4>{activeConversation.counterpartName}</h4>
+                      <p className="offers-panel-subtitle">{activeConversation.listingTitle}</p>
+                    </div>
+                  </div>
+                  <span className={`status-pill ${activeConversation.status}`}>{activeConversation.status}</span>
+                </div>
+
+                <div className="offers-summary-grid">
+                  <div className="modal-meta-item">
+                    <span className="modal-meta-label">Dates</span>
+                    <strong>{activeConversation.dateRange}</strong>
+                  </div>
+                  <div className="modal-meta-item">
+                    <span className="modal-meta-label">Current total</span>
+                    <strong>EUR {activeConversation.totalPrice}</strong>
+                  </div>
+                  <div className="modal-meta-item">
+                    <span className="modal-meta-label">Role</span>
+                    <strong>{activeConversation.isOwner ? "Owner" : "Renter"}</strong>
+                  </div>
+                </div>
+
+                <div className="offers-thread-window">
+                  <div className="offers-message-stack">
+                    {activeConversation.messages.map((message) => {
+                      const bubbleClass =
+                        message.sender === "me"
+                          ? "outgoing"
+                          : message.sender === "them"
+                            ? "incoming"
+                            : "system";
+
+                      return (
+                        <div className={`offers-message ${bubbleClass}`} key={message.id}>
+                          {message.kind === "deal" && message.deal ? (
+                            <div className="offers-deal-card">
+                              <div className="offers-deal-head">
+                                <div>
+                                  <small>{message.sender === "me" ? "You sent an agreement" : `${activeConversation.counterpartName} sent an agreement`}</small>
+                                  <strong>{message.deal.title}</strong>
+                                </div>
+                                <span className={`offers-deal-state ${message.deal.state}`}>{message.deal.state}</span>
+                              </div>
+                              <div className="offers-deal-grid">
+                                <div>
+                                  <span>Amount</span>
+                                  <strong>EUR {message.deal.amount}</strong>
+                                </div>
+                                <div>
+                                  <span>Deposit</span>
+                                  <strong>{message.deal.deposit}</strong>
+                                </div>
+                                <div>
+                                  <span>Dates</span>
+                                  <strong>{message.deal.dateRange}</strong>
+                                </div>
+                              </div>
+                              {message.deal.note ? <p>{message.deal.note}</p> : null}
+                              {message.sender === "them" && message.deal.state === "pending" ? (
+                                <div className="offers-deal-actions">
+                                  <button
+                                    className="secondary-button"
+                                    onClick={() => respondToDeal(message.id, "declined")}
+                                    type="button"
+                                  >
+                                    Decline
+                                  </button>
+                                  <button
+                                    className="primary-button"
+                                    onClick={() => respondToDeal(message.id, "accepted")}
+                                    type="button"
+                                  >
+                                    Accept agreement
+                                  </button>
+                                </div>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <>
+                              <small>
+                                {message.sender === "me"
+                                  ? "You"
+                                  : message.sender === "them"
+                                    ? activeConversation.counterpartName
+                                    : "Update"}
+                              </small>
+                              <p>{message.text}</p>
+                            </>
+                          )}
+                          <span className="offers-message-time">{formatMessageTime(message.created_at)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="offers-composer">
+                  <div className="offers-composer-actions">
+                    <button
+                      className={`secondary-button${showDealForm ? " active" : ""}`}
+                      onClick={() => setShowDealForm((current) => !current)}
+                      type="button"
+                    >
+                      {showDealForm ? "Close agreement" : "Send agreement"}
+                    </button>
+                  </div>
+
+                  {showDealForm && (
+                    <div className="offers-deal-form">
+                      <div className="split">
+                        <input
+                          onChange={(event) => setDealForm((current) => ({ ...current, title: event.target.value }))}
+                          placeholder="Agreement title"
+                          value={dealForm.title}
+                        />
+                        <input
+                          onChange={(event) => setDealForm((current) => ({ ...current, amount: event.target.value }))}
+                          placeholder="Total amount"
+                          value={dealForm.amount}
+                        />
+                      </div>
+                      <div className="split">
+                        <input
+                          onChange={(event) => setDealForm((current) => ({ ...current, deposit: event.target.value }))}
+                          placeholder="Deposit"
+                          value={dealForm.deposit}
+                        />
+                        <input disabled value={activeConversation.dateRange} />
+                      </div>
+                      <textarea
+                        onChange={(event) => setDealForm((current) => ({ ...current, note: event.target.value }))}
+                        placeholder="Agreement note"
+                        value={dealForm.note}
+                      />
+                      <div className="offers-deal-form-actions">
+                        <button className="primary-button" onClick={sendDeal} type="button">
+                          Send agreement
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <textarea
+                    className="offers-composer-input"
+                    onChange={(event) => setComposerValue(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !event.shiftKey) {
+                        event.preventDefault();
+                        sendMessage();
+                      }
+                    }}
+                    placeholder="Write a message..."
+                    value={composerValue}
+                  />
+                  <div className="offers-composer-footer">
+                    <p>Keep the thread short. Use agreements only when terms are clear.</p>
+                    <button className="primary-button" disabled={!composerValue.trim()} onClick={sendMessage} type="button">
+                      Send
+                    </button>
+                  </div>
+                </div>
+              </article>
+            )}
+          </div>
+        )}
       </section>
     </main>
   );
@@ -1544,14 +2026,18 @@ function SettingsScreen(props: {
 
 function ListingModal(props: {
   listing: Listing;
+  rentalCount: number;
   reviews: Review[];
+  onMessageOwner: (listing: Listing) => void;
   t: typeof en;
   onClose: () => void;
 }) {
-  const { listing, reviews, t, onClose } = props;
+  const { listing, rentalCount, reviews, onMessageOwner, t, onClose } = props;
   const galleryRef = useRef<HTMLDivElement>(null);
   const photos = listing.photo_urls?.length ? listing.photo_urls : [listing.image_url].filter(Boolean);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+  const hasListingRating = Number(listing.rating) > 0;
+  const hasOwnerRating = Number(listing.owner.score) > 0;
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
@@ -1563,9 +2049,8 @@ function ListingModal(props: {
     };
   }, [onClose]);
 
-  useEffect(() => {
-    setActivePhotoIndex(0);
-  }, [listing.id]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setActivePhotoIndex(0); }, [listing.id]);
 
   const handleGalleryScroll = () => {
     if (!galleryRef.current) return;
@@ -1650,13 +2135,26 @@ function ListingModal(props: {
                 </div>
               </div>
             </div>
-            {Number(listing.rating) > 0 && (
-              <div className="modal-rating">
-                <span className="modal-rating-label">Rating</span>
-                <div className="modal-rating-value">
-                  <StarRating score={listing.rating} />
-                  <span>({listing.review_count})</span>
-                </div>
+            {(hasListingRating || hasOwnerRating) && (
+              <div className="modal-rating-grid">
+                {hasListingRating && (
+                  <div className="modal-rating">
+                    <div className="modal-rating-value">
+                      <StarRating score={listing.rating} />
+                      <span>({listing.review_count})</span>
+                    </div>
+                    <p className="modal-rating-notes">Quality · Condition</p>
+                  </div>
+                )}
+                {hasOwnerRating && (
+                  <div className="modal-rating">
+                    <div className="modal-rating-value">
+                      <StarRating score={listing.owner.score} />
+                      <span>({listing.owner.review_count})</span>
+                    </div>
+                    <p className="modal-rating-notes">Kindness · Communication</p>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1664,28 +2162,24 @@ function ListingModal(props: {
           {/* ── Details ── */}
           <div className="modal-meta">
             <div className="modal-meta-item">
-              <span className="modal-meta-label">City</span>
-              <strong>{listing.city}</strong>
+              <span className="modal-meta-label">Location</span>
+              <strong><MapPin size={15} /> {listing.city}</strong>
             </div>
             <div className="modal-meta-item">
               <span className="modal-meta-label">{t.modal.deposit}</span>
-              <strong>EUR {listing.deposit}</strong>
+              <strong><Shield size={15} /> EUR {listing.deposit}</strong>
             </div>
             <div className="modal-meta-item">
               <span className="modal-meta-label">{t.modal.listed}</span>
-              <strong>{new Date(listing.created_at).toLocaleDateString()}</strong>
+              <strong><CalendarDays size={15} /> {new Date(listing.created_at).toLocaleDateString()}</strong>
             </div>
             <div className="modal-meta-item">
-              <span className="modal-meta-label">{t.explore.views}</span>
+              <span className="modal-meta-label">Rent times</span>
+              <strong><Repeat size={15} /> {rentalCount}</strong>
+            </div>
+            <div className="modal-meta-item">
+              <span className="modal-meta-label">Clicks</span>
               <strong><Eye size={15} /> {formatCompactCount(listing.views_count)}</strong>
-            </div>
-            <div className="modal-meta-item">
-              <span className="modal-meta-label">{t.explore.clicks}</span>
-              <strong><MousePointerClick size={15} /> {formatCompactCount(listing.clicks_count)}</strong>
-            </div>
-            <div className="modal-meta-item">
-              <span className="modal-meta-label">{t.explore.shares}</span>
-              <strong><Share2 size={15} /> {formatCompactCount(listing.shares_count)}</strong>
             </div>
           </div>
 
@@ -1693,6 +2187,17 @@ function ListingModal(props: {
           <div className="modal-section">
             <p className="modal-section-label">About this listing</p>
             <p className="modal-desc">{listing.description}</p>
+            <button
+              className="secondary-button modal-message-button"
+              onClick={() => {
+                onMessageOwner(listing);
+                onClose();
+              }}
+              type="button"
+            >
+              <MessageSquare size={16} />
+              {t.modal.messageOwner}
+            </button>
           </div>
 
           <div className="modal-divider" />
@@ -1706,7 +2211,7 @@ function ListingModal(props: {
               <p className="modal-owner-label">{t.modal.owner}</p>
               <strong>{listing.owner.full_name}</strong>
               <div className="modal-owner-meta">
-                <span><StarRating score={listing.owner.score} /> {listing.owner.review_count} {t.common.reviews}</span>
+                <span>{listing.owner.review_count} {t.common.reviews}</span>
                 {listing.owner.response_time && <span>{t.modal.responseTime}: {listing.owner.response_time}</span>}
                 {listing.owner.joined_at && <span>{t.modal.memberSince}: {new Date(listing.owner.joined_at).getFullYear()}</span>}
               </div>

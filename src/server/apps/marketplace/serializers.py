@@ -65,7 +65,9 @@ class ListingSerializer(serializers.ModelSerializer):
 
         if photo_urls is None:
             existing_photo_urls = getattr(self.instance, "photo_urls", [])
-            attrs["photo_urls"] = existing_photo_urls or ([image_url] if image_url else [])
+            attrs["photo_urls"] = existing_photo_urls or (
+                [image_url] if image_url else []
+            )
         elif not photo_urls and image_url:
             attrs["photo_urls"] = [image_url]
 
