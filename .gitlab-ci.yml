@@ -149,7 +149,7 @@ client-build:
   before_script:
     - apt-get update && apt-get install -y --no-install-recommends openssh-client rsync
     - mkdir -p ~/.ssh
-    - cp "$SSH_PRIVATE_KEY" ~/.ssh/id_ed25519
+    - echo "$SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/id_ed25519
     - chmod 600 ~/.ssh/id_ed25519
     - ssh-keyscan -p 222 www697.your-server.de >> ~/.ssh/known_hosts
   script:
