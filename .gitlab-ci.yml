@@ -179,7 +179,7 @@ deploy-prod:
   extends: .deploy-template
   variables:
     DEPLOY_ENV: prod
-    STATIC_PATH: /usr/www/users/afp9vy/amonzi.com/
+    STATIC_PATH: /usr/www/users/afp9vy/
   environment:
     name: production
     url: https://amonzi.com
