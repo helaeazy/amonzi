@@ -81,12 +81,13 @@ server-test:
   stage: test
   image: python:3.12-slim
   services:
-    - postgres:16-alpine
+    - name: postgres:16-alpine
+      variables:
+        POSTGRES_USER: ci_user
+        POSTGRES_PASSWORD: ci_pass
+        POSTGRES_DB: ci_amonzi
   variables:
     PYTHONPATH: "src/server"
-    # postgres service uses project-level POSTGRES_USER/PASSWORD/DB to init;
-    # we only need to point Django at the service container instead of the managed DB.
-    POSTGRES_HOST_AUTH_METHOD: trust
     UV_PROJECT_ENVIRONMENT: "$CI_PROJECT_DIR/.venv"
     PIP_CACHE_DIR: "$CI_PROJECT_DIR/.pip-cache"
   cache:
@@ -101,8 +102,12 @@ server-test:
     - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates build-essential
     - curl -LsSf https://astral.sh/uv/install.sh | sh
     - export PATH="$HOME/.local/bin:$PATH"
-    # Redirect Django to the ephemeral service container (only host needs overriding)
+    # Point Django at the ephemeral service container with the test credentials
     - export POSTGRES_HOST=postgres
+    - export POSTGRES_USER=ci_user
+    - export POSTGRES_PASSWORD=ci_pass
+    - export POSTGRES_DB=ci_amonzi
+    - export POSTGRES_PORT=5432
   needs:
     - server-quality
   script:
