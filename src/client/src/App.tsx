@@ -649,26 +649,29 @@ function HomeScreen(props: {
         </div>
       </header>
 
-      <section className="home-login-card">
+      <section className="home-hero">
         <div className="home-copy">
           <p className="brand-mark">Amonzi</p>
-          <h1>Redzi, gribi, nomā.</h1>
-          <p className="lead">Vienkārša noma. Ātra ieeja. Skaidri sludinājumi.</p>
+          <h1>Noma bez haosa, čatiem un liekiem soļiem.</h1>
+          <p className="lead">
+            Atrodi mantas sev tuvumā, nosūti pieprasījumu un pārvaldi visu vienā plūsmā.
+            No pirmā klikšķa līdz vienošanās brīdim.
+          </p>
           <p className="home-status-line">
             {isSignedIn
-              ? `Pieslēdzies kā ${props.authUser?.displayName || props.authUser?.email}.`
+              ? `Pieslēdzies kā ${props.authUser?.displayName || props.authUser?.email}. Vari uzreiz turpināt pārlūkot sludinājumus.`
               : props.authReady
-                ? "Ienāc ar Google un uzreiz atver sludinājumus, pieprasījumus un profilu."
-                : "Pārbauda pieteikšanos..."}
+                ? "Sākuma lapa paskaidro plūsmu, bet visa darbība notiek platformā: Explore, Offers, Profile."
+                : "Pārbauda pieteikšanās stāvokli..."}
           </p>
           <div className="home-actions">
             {isSignedIn ? (
               <Link className="primary-button" to="/app">
-                Doties uz sludinājumiem
+                Atvērt sludinājumus
               </Link>
             ) : props.canUseGoogleSignIn ? (
               <button className="primary-button" onClick={props.onGoogleSignIn} type="button">
-                Ieiet ar Google
+                Turpināt ar Google
               </button>
             ) : (
               <Link className="primary-button" to="/app">
@@ -676,64 +679,124 @@ function HomeScreen(props: {
               </Link>
             )}
             <Link className="secondary-button" to="/app">
-              Ieiet platformā
+              Skatīt platformu
             </Link>
           </div>
         </div>
+
+        <aside className="home-hero-panel">
+          <div className="home-stat-stack">
+            <article className="home-metric-card">
+              <span>Aktīvi sludinājumi</span>
+              <strong>{props.overview?.stats.live_listings ?? 0}</strong>
+            </article>
+            <article className="home-metric-card">
+              <span>Pabeigtas nomas</span>
+              <strong>{props.overview?.stats.completed_rentals ?? 0}</strong>
+            </article>
+            <article className="home-metric-card">
+              <span>Atsauksmes</span>
+              <strong>{props.overview?.stats.reviews ?? 0}</strong>
+            </article>
+          </div>
+          <div className="home-route-preview">
+            <div className="home-route-card">
+              <span className="tag">Explore</span>
+              <strong>Filtri, cenas, pilsētas un pieejamie ieraksti</strong>
+            </div>
+            <div className="home-route-card">
+              <span className="tag">Offers</span>
+              <strong>Pieprasījumi un vienošanās vienā strukturētā vietā</strong>
+            </div>
+            <div className="home-route-card">
+              <span className="tag">Profile</span>
+              <strong>Profils, uzticība un publiskā vēsture</strong>
+            </div>
+          </div>
+        </aside>
       </section>
 
-      <section className="home-grid">
+      <section className="home-feature-grid">
         <article className="home-step">
-          <span className="tag">1</span>
-          <strong>Pieslēdzies</strong>
-          <p>Ieeja ar Google un tava profila sagatavošana notiek vienā plūsmā.</p>
+          <span className="tag">01</span>
+          <strong>Ieeja un profils</strong>
+          <p>Google pieslēgšanās, profils un publiskā identitāte tiek sagatavoti bez liekas konfigurēšanas.</p>
         </article>
         <article className="home-step">
-          <span className="tag">2</span>
-          <strong>Atrodi sludinājumus</strong>
-          <p>Meklē pēc pilsētas, kategorijas un cenas, pēc tam atver sev vajadzīgo ierakstu.</p>
+          <span className="tag">02</span>
+          <strong>Atlasāma pārlūkošana</strong>
+          <p>Explore lapa ir galvenais darba lauks: meklēšana, kategorijas, pilsēta un cenu salīdzināšana.</p>
         </article>
         <article className="home-step">
-          <span className="tag">3</span>
-          <strong>Nosūti pieprasījumu</strong>
-          <p>Pārvaldi nomas pieprasījumus, sarunas un savus sludinājumus vienā vietā.</p>
-        </article>
-      </section>
-
-      <section className="home-grid">
-        <article className="home-step">
-          <span className="tag">Explore</span>
-          <strong>Galvenā lapa ar visiem sludinājumiem</strong>
-          <p>Tieši tur atrodas saraksts ar visām pieejamajām precēm un filtriem.</p>
-        </article>
-        <article className="home-step">
-          <span className="tag">Offers</span>
-          <strong>Pārskatāmas vienošanās</strong>
-          <p>Ziņas un nomas vienošanās paliek strukturētas, nevis izkaisītas pa dažādām vietām.</p>
-        </article>
-        <article className="home-step">
-          <span className="tag">Profile</span>
-          <strong>Uzticība un atsauksmes</strong>
-          <p>Profils, vērtējumi un sludinājumu vēsture palīdz saprast, ar ko ir droši sadarboties.</p>
+          <span className="tag">03</span>
+          <strong>Skairda vienošanās plūsma</strong>
+          <p>Pieprasījumi, ziņas un statusi neizjūk starp vairākām vietām, tāpēc process paliek saprotams.</p>
         </article>
       </section>
 
-      <section className="home-grid">
-        <article className="home-step">
-          <span>Sludinājumi</span>
-          <strong>{props.overview?.stats.live_listings ?? 0}</strong>
-          <p>Aktīvi ieraksti platformā šobrīd.</p>
-        </article>
-        <article className="home-step">
-          <span>Nomas</span>
-          <strong>{props.overview?.stats.completed_rentals ?? 0}</strong>
-          <p>Kopējais pieprasījumu un nomu skaits.</p>
-        </article>
-        <article className="home-step">
-          <span>Atsauksmes</span>
-          <strong>{props.overview?.stats.reviews ?? 0}</strong>
-          <p>Atsauksmes, kas palīdz izvēlēties pareizo īpašnieku.</p>
-        </article>
+      <section className="home-section">
+        <div className="section-head">
+          <h2>Ko lietotājs dara platformā</h2>
+          <p>Trīs galvenie soļi, ap kuriem balstās visa produkta pieredze.</p>
+        </div>
+        <div className="home-story-grid">
+          <article className="home-story-card">
+            <span className="home-story-index">1</span>
+            <strong>Atrod piemērotu lietu</strong>
+            <p>Sludinājumu saraksts ir veidots ātrai atlasei, nevis dekoratīvam troksnim.</p>
+          </article>
+          <article className="home-story-card">
+            <span className="home-story-index">2</span>
+            <strong>Pārbauda detaļas un īpašnieku</strong>
+            <p>Pirms pieprasījuma redzams profils, cena, lokācija un sociālais uzticamības signāls.</p>
+          </article>
+          <article className="home-story-card">
+            <span className="home-story-index">3</span>
+            <strong>Noslēdz vienošanos</strong>
+            <p>Offers sadaļa savāc komunikāciju, statusus un turpmākās darbības vienā skata punktā.</p>
+          </article>
+        </div>
+      </section>
+
+      <section className="home-section">
+        <div className="section-head">
+          <h2>Izcelti sludinājumi</h2>
+          <p>Daži piemēri no tā, ko lietotājs redzēs jau pirmajā ekrānā.</p>
+        </div>
+        <div className="home-listing-grid">
+          {(props.overview?.featured_listings ?? []).slice(0, 3).map((listing) => (
+            <article className="home-listing-card" key={listing.id}>
+              <div className="home-listing-image" style={{ backgroundImage: `url(${listing.image_url})` }} />
+              <div className="home-listing-body">
+                <div className="home-listing-top">
+                  <span className="tag">{listing.category}</span>
+                  <strong>EUR {listing.price_per_day}/dienā</strong>
+                </div>
+                <h3>{listing.title}</h3>
+                <p>{listing.city}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="home-section">
+        <div className="section-head">
+          <h2>Uzticība pirms darījuma</h2>
+          <p>Pirms cilvēks nospiež pieprasījumu, viņam jāredz, ka platforma ir skaidra un paredzama.</p>
+        </div>
+        <div className="home-review-grid">
+          {(props.overview?.recent_reviews ?? []).slice(0, 3).map((review) => (
+            <article className="home-review-card" key={review.id}>
+              <span className="tag">Atsauksme</span>
+              <strong>{review.reviewed_member_name}</strong>
+              <span className="rating-line">
+                <StarRating score={review.rating} />
+              </span>
+              <p>{review.comment}</p>
+            </article>
+          ))}
+        </div>
       </section>
     </main>
   );
