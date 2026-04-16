@@ -837,6 +837,7 @@ h2 {
   gap: 12px;
   flex-wrap: wrap;
   justify-content: center;
+  margin-top: 32px;
   margin-bottom: 28px;
 }
 
