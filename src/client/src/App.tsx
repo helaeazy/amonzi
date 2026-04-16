@@ -205,10 +205,13 @@ function App() {
       if (authReady && !user) {
         navigate("/");
       }
+      if (user && location.pathname === "/") {
+        navigate("/app");
+      }
       setAuthUser(user);
       setAuthReady(true);
     });
-  }, [authReady, navigate]);
+  }, [authReady, navigate, location.pathname]);
 
   const memberSyncQuery = useQuery({
     queryKey: ["member-sync", authUser?.email],
