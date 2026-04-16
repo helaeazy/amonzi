@@ -603,6 +603,15 @@ function App() {
   );
 }
 
+const HOME_CATS = [
+  { emoji: "🔧", label: "Instrumenti" },
+  { emoji: "🚗", label: "Transports" },
+  { emoji: "📱", label: "Elektronika" },
+  { emoji: "🎉", label: "Pasākumi" },
+  { emoji: "🏠", label: "Māja" },
+  { emoji: "🌲", label: "Daba" },
+];
+
 function HomeScreen(props: {
   overview: Awaited<ReturnType<typeof api.getOverview>> | undefined;
   authReady: boolean;
@@ -612,192 +621,106 @@ function HomeScreen(props: {
   onSignOut: () => void;
 }) {
   const isSignedIn = Boolean(props.authUser);
+  const stats = props.overview?.stats;
 
   return (
     <main className="home-shell">
       <header className="app-header home-topbar">
-        <Link className="app-header-logo" to="/app">
-          Amonzi
-        </Link>
+        <Link className="app-header-logo" to="/app">Amonzi</Link>
         <div className="home-header-actions">
           {isSignedIn ? (
             <>
-              <Link className="secondary-button" to="/app">
-                Skatīt sludinājumus
-              </Link>
-              <button className="secondary-button" onClick={props.onSignOut} type="button">
-                Izrakstīties
-              </button>
+              <Link className="secondary-button" to="/app">Atvērt</Link>
+              <button className="secondary-button" onClick={props.onSignOut} type="button">Iziet</button>
             </>
           ) : props.canUseGoogleSignIn ? (
             <>
-              <button className="secondary-button" onClick={props.onGoogleSignIn} type="button">
-                Pieslēgties
-              </button>
-              <Link className="primary-button" to="/app">
-                Atvērt platformu
-              </Link>
+              <button className="secondary-button" onClick={props.onGoogleSignIn} type="button">Pieslēgties</button>
+              <Link className="primary-button" to="/app">Ienākt</Link>
             </>
           ) : (
-            <>
-              <span className="tag">Auth disabled</span>
-              <Link className="primary-button" to="/app">
-                Atvērt platformu
-              </Link>
-            </>
+            <Link className="primary-button" to="/app">Atvērt platformu</Link>
           )}
         </div>
       </header>
 
-      <section className="home-hero">
-        <div className="home-copy">
-          <p className="brand-mark">Amonzi</p>
-          <h1>Noma bez haosa, čatiem un liekiem soļiem.</h1>
-          <p className="lead">
-            Atrodi mantas sev tuvumā, nosūti pieprasījumu un pārvaldi visu vienā plūsmā.
-            No pirmā klikšķa līdz vienošanās brīdim.
-          </p>
-          <p className="home-status-line">
-            {isSignedIn
-              ? `Pieslēdzies kā ${props.authUser?.displayName || props.authUser?.email}. Vari uzreiz turpināt pārlūkot sludinājumus.`
-              : props.authReady
-                ? "Sākuma lapa paskaidro plūsmu, bet visa darbība notiek platformā: Explore, Offers, Profile."
-                : "Pārbauda pieteikšanās stāvokli..."}
-          </p>
-          <div className="home-actions">
-            {isSignedIn ? (
-              <Link className="primary-button" to="/app">
-                Atvērt sludinājumus
-              </Link>
-            ) : props.canUseGoogleSignIn ? (
-              <button className="primary-button" onClick={props.onGoogleSignIn} type="button">
-                Turpināt ar Google
-              </button>
-            ) : (
-              <Link className="primary-button" to="/app">
-                Atvērt platformu
-              </Link>
-            )}
-            <Link className="secondary-button" to="/app">
-              Skatīt platformu
-            </Link>
-          </div>
+      {/* ── Hero ── */}
+      <section className="home-hero-new">
+        <p className="home-eyebrow">Latvijas nomas platforma</p>
+        <h1 className="home-headline">Nomā ko vajag.</h1>
+        <div className="home-hero-actions">
+          {isSignedIn ? (
+            <Link className="primary-button home-cta-btn" to="/app">Atvērt sludinājumus</Link>
+          ) : props.canUseGoogleSignIn ? (
+            <>
+              <button className="primary-button home-cta-btn" onClick={props.onGoogleSignIn} type="button">Sākt ar Google</button>
+              <Link className="secondary-button home-cta-btn" to="/app">Skatīt platformu</Link>
+            </>
+          ) : (
+            <Link className="primary-button home-cta-btn" to="/app">Atvērt platformu</Link>
+          )}
         </div>
-
-        <aside className="home-hero-panel">
-          <div className="home-stat-stack">
-            <article className="home-metric-card">
-              <span>Aktīvi sludinājumi</span>
-              <strong>{props.overview?.stats.live_listings ?? 0}</strong>
-            </article>
-            <article className="home-metric-card">
-              <span>Pabeigtas nomas</span>
-              <strong>{props.overview?.stats.completed_rentals ?? 0}</strong>
-            </article>
-            <article className="home-metric-card">
-              <span>Atsauksmes</span>
-              <strong>{props.overview?.stats.reviews ?? 0}</strong>
-            </article>
-          </div>
-          <div className="home-route-preview">
-            <div className="home-route-card">
-              <span className="tag">Explore</span>
-              <strong>Filtri, cenas, pilsētas un pieejamie ieraksti</strong>
+        {stats && (
+          <div className="home-stats">
+            <div className="home-stat">
+              <strong>{stats.live_listings}</strong>
+              <span>Sludinājumi</span>
             </div>
-            <div className="home-route-card">
-              <span className="tag">Offers</span>
-              <strong>Pieprasījumi un vienošanās vienā strukturētā vietā</strong>
+            <div className="home-stat-div" />
+            <div className="home-stat">
+              <strong>10,000+</strong>
+              <span>Lietotāji</span>
             </div>
-            <div className="home-route-card">
-              <span className="tag">Profile</span>
-              <strong>Profils, uzticība un publiskā vēsture</strong>
+            <div className="home-stat-div" />
+            <div className="home-stat">
+              <strong>{stats.completed_rentals}</strong>
+              <span>Darījumi</span>
             </div>
           </div>
-        </aside>
+        )}
       </section>
 
-      <section className="home-feature-grid">
-        <article className="home-step">
-          <span className="tag">01</span>
-          <strong>Ieeja un profils</strong>
-          <p>Google pieslēgšanās, profils un publiskā identitāte tiek sagatavoti bez liekas konfigurēšanas.</p>
-        </article>
-        <article className="home-step">
-          <span className="tag">02</span>
-          <strong>Atlasāma pārlūkošana</strong>
-          <p>Explore lapa ir galvenais darba lauks: meklēšana, kategorijas, pilsēta un cenu salīdzināšana.</p>
-        </article>
-        <article className="home-step">
-          <span className="tag">03</span>
-          <strong>Skairda vienošanās plūsma</strong>
-          <p>Pieprasījumi, ziņas un statusi neizjūk starp vairākām vietām, tāpēc process paliek saprotams.</p>
-        </article>
+      {/* ── Categories ── */}
+      <section className="home-cats">
+        {HOME_CATS.map((item) => (
+          <Link key={item.label} className="home-cat-tile" to="/app">
+            <span className="home-cat-icon">{item.emoji}</span>
+            <span className="home-cat-label">{item.label}</span>
+          </Link>
+        ))}
       </section>
 
-      <section className="home-section">
-        <div className="section-head">
-          <h2>Ko lietotājs dara platformā</h2>
-          <p>Trīs galvenie soļi, ap kuriem balstās visa produkta pieredze.</p>
+      {/* ── How it works ── */}
+      <section className="home-steps">
+        <div className="home-step">
+          <span className="home-step-num">01</span>
+          <strong>Atrodi</strong>
+          <p>Pārlūko pēc kategorijas vai pilsētas.</p>
         </div>
-        <div className="home-story-grid">
-          <article className="home-story-card">
-            <span className="home-story-index">1</span>
-            <strong>Atrod piemērotu lietu</strong>
-            <p>Sludinājumu saraksts ir veidots ātrai atlasei, nevis dekoratīvam troksnim.</p>
-          </article>
-          <article className="home-story-card">
-            <span className="home-story-index">2</span>
-            <strong>Pārbauda detaļas un īpašnieku</strong>
-            <p>Pirms pieprasījuma redzams profils, cena, lokācija un sociālais uzticamības signāls.</p>
-          </article>
-          <article className="home-story-card">
-            <span className="home-story-index">3</span>
-            <strong>Noslēdz vienošanos</strong>
-            <p>Offers sadaļa savāc komunikāciju, statusus un turpmākās darbības vienā skata punktā.</p>
-          </article>
+        <div className="home-step">
+          <span className="home-step-num">02</span>
+          <strong>Vienojies</strong>
+          <p>Sazinies ar īpašnieku tieši platformā.</p>
+        </div>
+        <div className="home-step">
+          <span className="home-step-num">03</span>
+          <strong>Nomā</strong>
+          <p>Saņem, izmanto un atdod. Vienkārši.</p>
         </div>
       </section>
 
-      <section className="home-section">
-        <div className="section-head">
-          <h2>Izcelti sludinājumi</h2>
-          <p>Daži piemēri no tā, ko lietotājs redzēs jau pirmajā ekrānā.</p>
-        </div>
-        <div className="home-listing-grid">
-          {(props.overview?.featured_listings ?? []).slice(0, 3).map((listing) => (
-            <article className="home-listing-card" key={listing.id}>
-              <div className="home-listing-image" style={{ backgroundImage: `url(${listing.image_url})` }} />
-              <div className="home-listing-body">
-                <div className="home-listing-top">
-                  <span className="tag">{listing.category}</span>
-                  <strong>EUR {listing.price_per_day}/dienā</strong>
-                </div>
-                <h3>{listing.title}</h3>
-                <p>{listing.city}</p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="home-section">
-        <div className="section-head">
-          <h2>Uzticība pirms darījuma</h2>
-          <p>Pirms cilvēks nospiež pieprasījumu, viņam jāredz, ka platforma ir skaidra un paredzama.</p>
-        </div>
-        <div className="home-review-grid">
-          {(props.overview?.recent_reviews ?? []).slice(0, 3).map((review) => (
-            <article className="home-review-card" key={review.id}>
-              <span className="tag">Atsauksme</span>
-              <strong>{review.reviewed_member_name}</strong>
-              <span className="rating-line">
-                <StarRating score={review.rating} />
-              </span>
-              <p>{review.comment}</p>
-            </article>
-          ))}
-        </div>
-      </section>
+      {/* ── Final CTA ── */}
+      {!isSignedIn && (
+        <section className="home-final-cta">
+          {props.canUseGoogleSignIn ? (
+            <button className="primary-button home-cta-btn" onClick={props.onGoogleSignIn} type="button">
+              Pieslēgties ar Google
+            </button>
+          ) : (
+            <Link className="primary-button home-cta-btn" to="/app">Atvērt platformu</Link>
+          )}
+        </section>
+      )}
     </main>
   );
 }
