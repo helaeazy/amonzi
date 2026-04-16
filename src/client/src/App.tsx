@@ -647,7 +647,7 @@ function HomeScreen(props: {
       {/* ── Hero ── */}
       <section className="home-hero-new">
         <p className="home-eyebrow">Latvijas nomas platforma</p>
-        <h1 className="home-headline">Nomā ko vajag.</h1>
+        <h1 className="home-headline">Redzi, Gribi, Nomā.</h1>
         <div className="home-hero-actions">
           {isSignedIn ? (
             <Link className="primary-button home-cta-btn" to="/app">Atvērt sludinājumus</Link>
