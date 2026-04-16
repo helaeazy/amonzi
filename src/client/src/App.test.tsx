@@ -77,7 +77,7 @@ describe("App", () => {
 
     expect(
       await screen.findByRole("heading", {
-        name: "Noma bez haosa, čatiem un liekiem soļiem.",
+        name: "Nomā ko vajag.",
       })
     ).toBeInTheDocument();
   });
