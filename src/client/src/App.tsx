@@ -1,5 +1,5 @@
 import { FormEvent, useRef, useDeferredValue, useEffect, useState, useTransition } from "react";
-import { Search, LayoutList, MessageSquare, User as UserIcon, Globe, ChevronLeft, ChevronRight, MoreHorizontal, LogOut, Eye, Plus, Trash2, X, MapPin, Shield, CalendarDays, Repeat } from "lucide-react";
+import { Search, LayoutList, MessageSquare, User as UserIcon, Globe, ChevronLeft, ChevronRight, MoreHorizontal, LogOut, Eye, Plus, Trash2, X, MapPin, Shield, CalendarDays, Repeat, Wallet } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import type { User } from "firebase/auth";
@@ -35,9 +35,15 @@ const initialListingForm = {
 };
 
 const MAX_LISTING_IMAGE_BYTES = 5 * 1024 * 1024;
+const LISTING_POST_FEE = 5;
+const LISTING_POST_DAYS = 30;
 
 function getListingPhotos(listing: Pick<Listing, "photo_urls" | "image_url">) {
   return listing.photo_urls?.length ? listing.photo_urls : [listing.image_url].filter(Boolean);
+}
+
+function hasListingReviews(listing: Pick<Listing, "review_count">) {
+  return Number(listing.review_count) > 0;
 }
 
 function readFileAsDataUrl(file: File) {
@@ -48,6 +54,43 @@ function readFileAsDataUrl(file: File) {
     reader.readAsDataURL(file);
   });
 }
+
+function formatApiError(error: unknown) {
+  if (!(error instanceof Error)) return "Request failed";
+  try {
+    const parsed = JSON.parse(error.message) as { detail?: string };
+    return parsed.detail || error.message;
+  } catch {
+    return error.message;
+  }
+}
+
+function getListingDurationLabel(createdAt: string) {
+  const created = new Date(createdAt);
+  const expires = new Date(created.getTime() + LISTING_POST_DAYS * 24 * 60 * 60 * 1000);
+  const remainingMs = expires.getTime() - Date.now();
+  const remainingDays = Math.max(0, Math.ceil(remainingMs / (24 * 60 * 60 * 1000)));
+
+  if (remainingDays === 0) {
+    return "Ends today";
+  }
+
+  if (remainingDays === 1) {
+    return "1 day left";
+  }
+
+  return `${remainingDays} days left`;
+}
+
+type PendingListingPreview = {
+  title: string;
+  description: string;
+  category: string;
+  city: string;
+  price_per_day: string;
+  image_url: string;
+  status: string;
+};
 
 const initialRentalForm = {
   listing: "",
@@ -77,6 +120,8 @@ const en = {
     rentalSent: "Rental request sent.", reviewPosted: "Review posted.",
     updatingFilters: "Updating filters…", loading: "Loading…",
     backendError: "Backend is not reachable. Start `make server`.",
+    walletUpdated: "Wallet updated.",
+    insufficientWallet: "Add money to your wallet before posting a new listing.",
   },
   explore: {
     title: "Find a rental",
@@ -93,6 +138,15 @@ const en = {
     placeholderTitle: "Listing title", placeholderDesc: "What is included, condition, pickup details",
     placeholderCity: "City", placeholderPrice: "Price per day (€)", placeholderDeposit: "Deposit (€)", placeholderImage: "Add picture",
     chooseImage: "Choose picture", removeImage: "Remove picture", imageHelp: "Upload a photo instead of pasting a link.",
+    walletTitle: "Wallet",
+    walletBalance: "Balance",
+    walletAllowance: "Posting power",
+    walletDuration: "Live duration",
+    walletOpen: "Open wallet",
+    walletAdd: "Add money",
+    walletContinue: "Continue to listing",
+    walletAmount: "Top up amount (€)",
+    walletPostingRule: "Each listing costs EUR 5.00 and stays live for 30 days.",
   },
   modal: {
     perDay: "/ day", deposit: "Deposit", owner: "Owner", memberSince: "Member since",
@@ -123,6 +177,8 @@ const lv: typeof en = {
     rentalSent: "Nomas pieprasījums nosūtīts.", reviewPosted: "Atsauksme publicēta.",
     updatingFilters: "Atjaunina filtrus…", loading: "Ielādē…",
     backendError: "Serveris nav sasniedzams. Palaidiet `make server`.",
+    walletUpdated: "Maks papildināts.",
+    insufficientWallet: "Pirms jauna sludinājuma publicēšanas papildiniet maku.",
   },
   explore: {
     title: "Atrast nomu",
@@ -139,6 +195,15 @@ const lv: typeof en = {
     placeholderTitle: "Sludinājuma nosaukums", placeholderDesc: "Kas iekļauts, stāvoklis, paņemšanas detaļas",
     placeholderCity: "Pilsēta", placeholderPrice: "Cena dienā (€)", placeholderDeposit: "Depozīts (€)", placeholderImage: "Pievienot attēlu",
     chooseImage: "Izvēlēties attēlu", removeImage: "Noņemt attēlu", imageHelp: "Augšupielādējiet attēlu, nevis saiti.",
+    walletTitle: "Maks",
+    walletBalance: "Bilance",
+    walletAllowance: "Cik var publicēt",
+    walletDuration: "Publicēšanas ilgums",
+    walletOpen: "Atvērt maku",
+    walletAdd: "Pievienot naudu",
+    walletContinue: "Turpināt uz sludinājumu",
+    walletAmount: "Papildinājuma summa (€)",
+    walletPostingRule: "Katrs sludinājums maksā EUR 5.00 un ir aktīvs 30 dienas.",
   },
   modal: {
     perDay: "/ dienā", deposit: "Depozīts", owner: "Īpašnieks", memberSince: "Dalībnieks kopš",
@@ -171,6 +236,7 @@ function App() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [reviewForm, setReviewForm] = useState(initialReviewForm);
   const [notice, setNotice] = useState("");
+  const [pendingListingPreview, setPendingListingPreview] = useState<PendingListingPreview | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isHeaderHiddenOnScroll, setIsHeaderHiddenOnScroll] = useState(false);
   const [isListingModalOpen, setIsListingModalOpen] = useState(false);
@@ -284,11 +350,32 @@ function App() {
     onSuccess: async () => {
       setNotice(tRef.current.notices.listingPublished);
       setListingForm(initialListingForm);
+      setPendingListingPreview(null);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["listings"] }),
         queryClient.invalidateQueries({ queryKey: ["overview"] }),
         queryClient.invalidateQueries({ queryKey: ["members"] }),
+        queryClient.invalidateQueries({ queryKey: ["member-sync"] }),
       ]);
+    },
+    onError: (error) => {
+      setPendingListingPreview(null);
+      setNotice(formatApiError(error));
+    },
+  });
+
+  const walletMutation = useMutation({
+    mutationFn: ({ id, walletBalance }: { id: number; walletBalance: string }) =>
+      api.updateMember(id, { wallet_balance: walletBalance }),
+    onSuccess: async () => {
+      setNotice(tRef.current.notices.walletUpdated);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["members"] }),
+        queryClient.invalidateQueries({ queryKey: ["member-sync"] }),
+      ]);
+    },
+    onError: (error) => {
+      setNotice(formatApiError(error));
     },
   });
 
@@ -373,6 +460,19 @@ function App() {
     if (!currentMemberId) {
       return;
     }
+    if (Number(currentMember?.wallet_balance ?? 0) < LISTING_POST_FEE) {
+      setNotice(tRef.current.notices.insufficientWallet);
+      return;
+    }
+    setPendingListingPreview({
+      title: listingForm.title,
+      description: listingForm.description,
+      category: listingForm.category,
+      city: listingForm.city,
+      price_per_day: listingForm.price_per_day,
+      image_url: listingForm.image_url,
+      status: "posting",
+    });
     listingMutation.mutate({
       owner_id: currentMemberId,
       title: listingForm.title,
@@ -385,6 +485,16 @@ function App() {
       photo_urls: listingForm.image_url ? [listingForm.image_url] : [],
       status: "live",
     });
+  };
+
+  const handleWalletTopUp = (amount: string) => {
+    if (!currentMemberId || !currentMember) return;
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      return;
+    }
+    const nextBalance = (Number(currentMember.wallet_balance) + numericAmount).toFixed(2);
+    walletMutation.mutate({ id: currentMemberId, walletBalance: nextBalance });
   };
 
   const handleMessageOwner = (listing: Listing) => {
@@ -579,6 +689,10 @@ function App() {
               onChange={setListingForm}
               onSubmit={handleListingSubmit}
               onDelete={(id) => deleteListingMutation.mutate(id)}
+              onTopUp={handleWalletTopUp}
+              pendingListing={pendingListingPreview}
+              walletBalance={currentMember?.wallet_balance ?? "0.00"}
+              walletBusy={walletMutation.isPending}
               t={t}
             />
           } />
@@ -876,10 +990,16 @@ function ExploreScreen(props: {
                   <div className="listing-title-row">
                     <div className="listing-title-copy">
                       <h4>{listing.title}</h4>
-                      <div className="listing-rating-value">
-                        <StarRating score={listing.owner.score} />
-                        <span>({listing.owner.review_count})</span>
-                      </div>
+                      {hasListingReviews(listing) ? (
+                        <div className="listing-rating-value">
+                          <StarRating score={listing.rating} />
+                          <span>({listing.review_count})</span>
+                        </div>
+                      ) : (
+                        <div className="listing-rating-value listing-rating-value--empty">
+                          <span>0 reviews</span>
+                        </div>
+                      )}
                     </div>
                     <strong className="listing-price-top">EUR {listing.price_per_day}/{props.t.common.day}</strong>
                   </div>
@@ -1355,12 +1475,20 @@ function MyPostsScreen(props: {
   onChange: React.Dispatch<React.SetStateAction<typeof initialListingForm>>;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onDelete: (id: number) => void;
+  onTopUp: (amount: string) => void;
+  pendingListing: PendingListingPreview | null;
+  walletBalance: string;
+  walletBusy: boolean;
   t: typeof en;
 }) {
   const [showForm, setShowForm] = useState(false);
+  const [showWalletModal, setShowWalletModal] = useState(false);
+  const [topUpAmount, setTopUpAmount] = useState("25");
   const myListings = props.listings.filter(
     (listing) => listing.owner.id === props.activeMember?.id
   );
+  const walletBalance = Number(props.walletBalance || 0);
+  const postingAllowance = Math.floor(walletBalance / LISTING_POST_FEE);
   const handleImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -1383,13 +1511,30 @@ function MyPostsScreen(props: {
             <h3>{props.t.myPosts.title}</h3>
             <p>{props.t.myPosts.subtitle}</p>
           </div>
-          <button
-            className={showForm ? "secondary-button" : "primary-button"}
-            onClick={() => setShowForm((v) => !v)}
-            type="button"
-          >
-            {showForm ? props.t.common.cancel : <><Plus size={16} /> {props.t.common.newListing}</>}
-          </button>
+          <div className="my-posts-actions">
+            <button
+              className="wallet-inline-button"
+              onClick={() => setShowWalletModal(true)}
+              type="button"
+            >
+              <span className="wallet-inline-balance">{walletBalance.toFixed(2)} EUR</span>
+              <Wallet size={16} />
+              <Plus size={16} />
+            </button>
+            <button
+              className={showForm ? "secondary-button" : "primary-button"}
+              onClick={() => {
+                if (showForm) {
+                  setShowForm(false);
+                  return;
+                }
+                setShowWalletModal(true);
+              }}
+              type="button"
+            >
+              {showForm ? props.t.common.cancel : <><Plus size={16} /> {props.t.common.newListing}</>}
+            </button>
+          </div>
         </div>
 
         {showForm && (
@@ -1451,10 +1596,51 @@ function MyPostsScreen(props: {
           </form>
         )}
 
-        {myListings.length === 0 ? (
+        {showWalletModal ? (
+          <WalletModal
+            balance={walletBalance}
+            canContinue={postingAllowance > 0}
+            days={LISTING_POST_DAYS}
+            fee={LISTING_POST_FEE}
+            isBusy={props.walletBusy}
+            onAmountChange={setTopUpAmount}
+            onClose={() => setShowWalletModal(false)}
+            onContinue={() => {
+              setShowWalletModal(false);
+              setShowForm(true);
+            }}
+            onTopUp={() => props.onTopUp(topUpAmount)}
+            t={props.t}
+            topUpAmount={topUpAmount}
+          />
+        ) : null}
+
+        {myListings.length === 0 && !props.pendingListing ? (
           <div className="notice">{props.t.common.noListings}</div>
         ) : (
           <div className="listing-grid">
+            {props.pendingListing ? (
+              <article className="listing-card listing-card--pending">
+                {props.pendingListing.image_url ? (
+                  <div
+                    className="listing-image"
+                    style={{ backgroundImage: `url(${props.pendingListing.image_url})` }}
+                  />
+                ) : null}
+                <div className="listing-body">
+                  <div className="listing-top">
+                    <strong>{props.pendingListing.title}</strong>
+                    <span className="status-pill posting">{props.pendingListing.status}</span>
+                  </div>
+                  <p>{props.pendingListing.description}</p>
+                  <div className="meta-stack">
+                    <span className="tag">{props.t.explore.categories[props.pendingListing.category as keyof typeof props.t.explore.categories] ?? props.pendingListing.category}</span>
+                    <span className="tag">{props.pendingListing.city}</span>
+                    <span className="tag">€{props.pendingListing.price_per_day}/{props.t.common.day}</span>
+                  </div>
+                </div>
+              </article>
+            ) : null}
             {myListings.map((listing) => (
               <article className="listing-card" key={listing.id}>
                 {getListingPhotos(listing)[0] && (
@@ -1473,6 +1659,7 @@ function MyPostsScreen(props: {
                     <span className="tag">{props.t.explore.categories[listing.category as keyof typeof props.t.explore.categories] ?? listing.category}</span>
                     <span className="tag">{listing.city}</span>
                     <span className="tag">€{listing.price_per_day}/{props.t.common.day}</span>
+                    <span className="tag muted">{getListingDurationLabel(listing.created_at)}</span>
                   </div>
                   <button
                     className="delete-button"
@@ -1489,6 +1676,75 @@ function MyPostsScreen(props: {
         )}
       </section>
     </main>
+  );
+}
+
+function WalletModal(props: {
+  balance: number;
+  canContinue: boolean;
+  days: number;
+  fee: number;
+  isBusy: boolean;
+  onAmountChange: (value: string) => void;
+  onClose: () => void;
+  onContinue: () => void;
+  onTopUp: () => void;
+  t: typeof en;
+  topUpAmount: string;
+}) {
+  const postingAllowance = Math.floor(props.balance / props.fee);
+
+  return (
+    <div className="modal-backdrop" onClick={props.onClose}>
+      <div className="modal-center" onClick={(event) => event.stopPropagation()}>
+        <section className="wallet-modal surface">
+          <div className="wallet-modal-head">
+            <div className="section-head">
+              <h3>{props.t.myPosts.walletTitle}</h3>
+              <p>{props.t.myPosts.walletPostingRule}</p>
+            </div>
+            <button className="modal-close" onClick={props.onClose} type="button">
+              <X size={20} />
+            </button>
+          </div>
+          <div className="wallet-summary wallet-summary--modal">
+            <article className="wallet-card">
+              <span className="wallet-label">{props.t.myPosts.walletBalance}</span>
+              <strong>EUR {props.balance.toFixed(2)}</strong>
+            </article>
+            <article className="wallet-card">
+              <span className="wallet-label">{props.t.myPosts.walletAllowance}</span>
+              <strong>{postingAllowance} items</strong>
+            </article>
+            <article className="wallet-card">
+              <span className="wallet-label">{props.t.myPosts.walletDuration}</span>
+              <strong>{props.days} days each</strong>
+            </article>
+          </div>
+          <div className="wallet-topup">
+            <input
+              min="1"
+              onChange={(event) => props.onAmountChange(event.target.value)}
+              placeholder={props.t.myPosts.walletAmount}
+              step="1"
+              type="number"
+              value={props.topUpAmount}
+            />
+            <button className="primary-button" disabled={props.isBusy} onClick={props.onTopUp} type="button">
+              {props.t.myPosts.walletAdd}
+            </button>
+          </div>
+          <div className="wallet-modal-actions">
+            <button className="secondary-button" onClick={props.onClose} type="button">
+              {props.t.common.cancel}
+            </button>
+            <button className="primary-button" disabled={!props.canContinue} onClick={props.onContinue} type="button">
+              {props.t.myPosts.walletContinue}
+            </button>
+          </div>
+        </section>
+      </div>
+    </div>
   );
 }
 
@@ -2111,7 +2367,7 @@ function ListingModal(props: {
   const galleryRef = useRef<HTMLDivElement>(null);
   const photos = getListingPhotos(listing);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
-  const hasListingRating = Number(listing.rating) > 0;
+  const hasListingRating = hasListingReviews(listing);
   const hasOwnerRating = Number(listing.owner.score) > 0;
 
   useEffect(() => {
@@ -2217,6 +2473,14 @@ function ListingModal(props: {
                     <div className="modal-rating-value">
                       <StarRating score={listing.rating} />
                       <span>({listing.review_count})</span>
+                    </div>
+                    <p className="modal-rating-notes">Quality · Condition</p>
+                  </div>
+                )}
+                {!hasListingRating && (
+                  <div className="modal-rating">
+                    <div className="modal-rating-value modal-rating-value--empty">
+                      <span>0 reviews</span>
                     </div>
                     <p className="modal-rating-notes">Quality · Condition</p>
                   </div>

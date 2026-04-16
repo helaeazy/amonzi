@@ -618,6 +618,11 @@ h2 {
   color: rgba(22, 49, 31, 0.82);
 }
 
+.listing-rating-value--empty,
+.modal-rating-value--empty {
+  font-weight: 700;
+}
+
 .owner-preview {
   display: grid;
   gap: 10px;
@@ -791,6 +796,16 @@ h2 {
 .status-pill.requested {
   background: #f3fbeb;
   color: #6da259;
+}
+
+.status-pill.posting {
+  background: #fff3dc;
+  color: #b16a10;
+}
+
+.listing-card--pending {
+  border-style: dashed;
+  opacity: 0.92;
 }
 
 .notice,
@@ -1845,6 +1860,77 @@ button.secondary-button.active {
 
 .my-posts-head .section-head {
   margin-bottom: 0;
+}
+
+.my-posts-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.wallet-inline-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(103, 162, 77, 0.18);
+  background: #f4fbe9;
+  color: #244230;
+  font-weight: 700;
+}
+
+.wallet-inline-balance {
+  white-space: nowrap;
+}
+
+.wallet-modal {
+  width: min(100%, 680px);
+  display: grid;
+  gap: 16px;
+}
+
+.wallet-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.wallet-summary--modal {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 0;
+}
+
+.wallet-card {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border-radius: 18px;
+  background: #f4fbe9;
+  border: 1px solid rgba(103, 162, 77, 0.14);
+}
+
+.wallet-label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(22, 49, 31, 0.56);
+}
+
+.wallet-card strong {
+  font-size: 1.32rem;
+  color: #16311f;
+}
+
+.wallet-topup,
+.wallet-modal-actions {
+  display: grid;
+  gap: 12px;
 }
 
 .my-posts-form {

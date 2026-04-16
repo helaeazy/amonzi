@@ -18,6 +18,7 @@ class MemberSerializer(serializers.ModelSerializer):
             "bio",
             "avatar_url",
             "response_time",
+            "wallet_balance",
             "joined_at",
             "score",
             "review_count",

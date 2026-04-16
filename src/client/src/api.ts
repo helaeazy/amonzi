@@ -40,6 +40,22 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  updateMember: (
+    id: number,
+    payload: Partial<{
+      full_name: string;
+      email: string;
+      city: string;
+      bio: string;
+      avatar_url: string;
+      response_time: string;
+      wallet_balance: string;
+    }>
+  ) =>
+    request<Member>(`/members/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
   createListing: (payload: {
     owner_id: number;
     title: string;

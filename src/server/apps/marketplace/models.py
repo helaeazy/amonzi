@@ -13,6 +13,7 @@ class Member(models.Model):
     bio = models.TextField(blank=True)
     avatar_url = models.URLField(blank=True)
     response_time = models.CharField(max_length=60, default="within 1 hour")
+    wallet_balance = models.DecimalField(max_digits=8, decimal_places=2, default=0)
     joined_at = models.DateField(default=date.today)
 
     class Meta:

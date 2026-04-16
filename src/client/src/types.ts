@@ -6,6 +6,7 @@ export type Member = {
   bio: string;
   avatar_url: string;
   response_time: string;
+  wallet_balance: string;
   joined_at: string;
   score: string;
   review_count: number;

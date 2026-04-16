@@ -1,3 +1,6 @@
+from decimal import Decimal
+
+from django.db import transaction
 from rest_framework import status, viewsets
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -11,6 +14,8 @@ from apps.marketplace.serializers import (
     RentalSerializer,
     ReviewSerializer,
 )
+
+LISTING_POST_FEE = Decimal("5.00")
 
 
 @api_view(["GET"])
@@ -41,6 +46,27 @@ class ListingViewSet(viewsets.ModelViewSet):
         if city:
             queryset = queryset.filter(city__iexact=city)
         return queryset
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        owner = serializer.validated_data["owner"]
+
+        if owner.wallet_balance < LISTING_POST_FEE:
+            return Response(
+                {
+                    "detail": f"Add at least EUR {LISTING_POST_FEE:.2f} to your wallet before posting."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            owner.wallet_balance -= LISTING_POST_FEE
+            owner.save(update_fields=["wallet_balance"])
+            self.perform_create(serializer)
+
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
 
 class RentalViewSet(viewsets.ModelViewSet):

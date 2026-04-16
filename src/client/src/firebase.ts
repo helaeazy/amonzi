@@ -29,6 +29,19 @@ provider.setCustomParameters({
   prompt: "select_account",
 });
 
+function shouldUseRedirectAuth() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const coarsePointer = window.matchMedia?.("(pointer: coarse)")?.matches ?? false;
+  const smallViewport = window.innerWidth < 1024;
+  const userAgent = navigator.userAgent || "";
+  const mobileUa = /Android|iPhone|iPad|iPod|Mobile|Opera Mini|IEMobile/i.test(userAgent);
+
+  return coarsePointer || (smallViewport && mobileUa);
+}
+
 export function subscribeToAuth(callback: (user: User | null) => void) {
   if (!auth) {
     callback(null);
@@ -41,11 +54,27 @@ export async function signInWithGoogle() {
   if (!auth) {
     throw new Error("Firebase is not configured.");
   }
-  if (window.innerWidth < 768) {
+  if (shouldUseRedirectAuth()) {
     await signInWithRedirect(auth, provider);
     return;
   }
-  await signInWithPopup(auth, provider);
+
+  try {
+    await signInWithPopup(auth, provider);
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error.code === "auth/popup-blocked" ||
+        error.code === "auth/web-storage-unsupported" ||
+        error.code === "auth/operation-not-supported-in-this-environment")
+    ) {
+      await signInWithRedirect(auth, provider);
+      return;
+    }
+    throw error;
+  }
 }
 
 export async function signOutFromGoogle() {
