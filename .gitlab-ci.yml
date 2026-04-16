@@ -152,9 +152,14 @@ client-build:
     - echo "$SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/id_ed25519
     - chmod 600 ~/.ssh/id_ed25519
     - ssh-keyscan -p 222 www697.your-server.de >> ~/.ssh/known_hosts
+    - ssh-keyscan 62.238.2.39 >> ~/.ssh/known_hosts
   script:
     # Deploy frontend to the Apache web root
     - rsync -az --delete -e "ssh -p 222" src/client/dist/ afp9vy@www697.your-server.de:$STATIC_PATH
+    # Deploy backend to VPS
+    - rsync -az --delete -e "ssh" src/server/ root@62.238.2.39:/srv/amonzi/src/server/
+    - rsync -az -e "ssh" pyproject.toml uv.lock root@62.238.2.39:/srv/amonzi/
+    - ssh root@62.238.2.39 "cd /srv/amonzi && export PATH=\$HOME/.local/bin:\$PATH && uv sync --frozen --python 3.12 && PYTHONPATH=/srv/amonzi/src/server uv run python src/server/manage.py migrate && systemctl restart amonzi"
 
 # ── Dev deploy — auto on dev/develop branch ─────────────────────────────────
 deploy-dev:
