@@ -34,6 +34,21 @@ const initialListingForm = {
   image_url: "",
 };
 
+const MAX_LISTING_IMAGE_BYTES = 5 * 1024 * 1024;
+
+function getListingPhotos(listing: Pick<Listing, "photo_urls" | "image_url">) {
+  return listing.photo_urls?.length ? listing.photo_urls : [listing.image_url].filter(Boolean);
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+    reader.onerror = () => reject(new Error("Could not read the selected image."));
+    reader.readAsDataURL(file);
+  });
+}
+
 const initialRentalForm = {
   listing: "",
   start_date: "2026-04-20",
@@ -76,7 +91,8 @@ const en = {
   myPosts: {
     title: "My Posts", subtitle: "Items you have listed for rent.",
     placeholderTitle: "Listing title", placeholderDesc: "What is included, condition, pickup details",
-    placeholderCity: "City", placeholderPrice: "Price per day (€)", placeholderDeposit: "Deposit (€)", placeholderImage: "Image URL",
+    placeholderCity: "City", placeholderPrice: "Price per day (€)", placeholderDeposit: "Deposit (€)", placeholderImage: "Add picture",
+    chooseImage: "Choose picture", removeImage: "Remove picture", imageHelp: "Upload a photo instead of pasting a link.",
   },
   modal: {
     perDay: "/ day", deposit: "Deposit", owner: "Owner", memberSince: "Member since",
@@ -121,7 +137,8 @@ const lv: typeof en = {
   myPosts: {
     title: "Mani sludinājumi", subtitle: "Preces, ko esat izlikuši iznomāšanai.",
     placeholderTitle: "Sludinājuma nosaukums", placeholderDesc: "Kas iekļauts, stāvoklis, paņemšanas detaļas",
-    placeholderCity: "Pilsēta", placeholderPrice: "Cena dienā (€)", placeholderDeposit: "Depozīts (€)", placeholderImage: "Attēla URL",
+    placeholderCity: "Pilsēta", placeholderPrice: "Cena dienā (€)", placeholderDeposit: "Depozīts (€)", placeholderImage: "Pievienot attēlu",
+    chooseImage: "Izvēlēties attēlu", removeImage: "Noņemt attēlu", imageHelp: "Augšupielādējiet attēlu, nevis saiti.",
   },
   modal: {
     perDay: "/ dienā", deposit: "Depozīts", owner: "Īpašnieks", memberSince: "Dalībnieks kopš",
@@ -365,6 +382,7 @@ function App() {
       price_per_day: listingForm.price_per_day,
       deposit: listingForm.deposit,
       image_url: listingForm.image_url,
+      photo_urls: listingForm.image_url ? [listingForm.image_url] : [],
       status: "live",
     });
   };
@@ -850,7 +868,7 @@ function ExploreScreen(props: {
               <div
                 className="listing-image"
                 style={{
-                  backgroundImage: `linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.22)), url(${listing.photo_urls?.[0] || listing.image_url})`,
+                  backgroundImage: `linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.22)), url(${getListingPhotos(listing)[0]})`,
                 }}
               />
               <div className="listing-body">
@@ -948,6 +966,20 @@ function PostScreen(props: {
   onChange: React.Dispatch<React.SetStateAction<typeof initialListingForm>>;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const handleImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (file.size > MAX_LISTING_IMAGE_BYTES) {
+      window.alert("Please choose an image smaller than 5 MB.");
+      event.target.value = "";
+      return;
+    }
+
+    const imageUrl = await readFileAsDataUrl(file);
+    props.onChange((current) => ({ ...current, image_url: imageUrl }));
+    event.target.value = "";
+  };
+
   return (
     <main className="screen">
       <section className="surface">
@@ -1021,15 +1053,14 @@ function PostScreen(props: {
               }
             />
           </div>
-          <input
-            placeholder="Image URL"
-            value={props.form.image_url}
-            onChange={(event) =>
-              props.onChange((current) => ({
-                ...current,
-                image_url: event.target.value,
-              }))
-            }
+          <ListingImageField
+            buttonLabel="Choose picture"
+            helpText="Upload a photo instead of pasting a link."
+            imageUrl={props.form.image_url}
+            onChange={props.onChange}
+            onFileChange={handleImageChange}
+            placeholder="Add picture"
+            removeLabel="Remove picture"
           />
           <button className="primary-button" disabled={props.isBusy} type="submit">
             {props.isBusy ? "Publishing..." : "Publish listing"}
@@ -1037,6 +1068,44 @@ function PostScreen(props: {
         </form>
       </section>
     </main>
+  );
+}
+
+function ListingImageField(props: {
+  buttonLabel: string;
+  helpText: string;
+  imageUrl: string;
+  onChange: React.Dispatch<React.SetStateAction<typeof initialListingForm>>;
+  onFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  placeholder: string;
+  removeLabel: string;
+}) {
+  return (
+    <div className="image-field">
+      <div className="image-field-header">
+        <span className="image-field-label">{props.placeholder}</span>
+        {props.imageUrl ? (
+          <button
+            className="image-field-remove"
+            onClick={() => props.onChange((current) => ({ ...current, image_url: "" }))}
+            type="button"
+          >
+            {props.removeLabel}
+          </button>
+        ) : null}
+      </div>
+      <label className="image-field-picker">
+        <input accept="image/*" onChange={props.onFileChange} type="file" />
+        <span>{props.buttonLabel}</span>
+      </label>
+      <p className="image-field-help">{props.helpText}</p>
+      {props.imageUrl ? (
+        <div
+          className="image-field-preview"
+          style={{ backgroundImage: `linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.16)), url(${props.imageUrl})` }}
+        />
+      ) : null}
+    </div>
   );
 }
 
@@ -1292,6 +1361,19 @@ function MyPostsScreen(props: {
   const myListings = props.listings.filter(
     (listing) => listing.owner.id === props.activeMember?.id
   );
+  const handleImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (file.size > MAX_LISTING_IMAGE_BYTES) {
+      window.alert("Please choose an image smaller than 5 MB.");
+      event.target.value = "";
+      return;
+    }
+
+    const imageUrl = await readFileAsDataUrl(file);
+    props.onChange((current) => ({ ...current, image_url: imageUrl }));
+    event.target.value = "";
+  };
 
   return (
     <main className="screen">
@@ -1354,10 +1436,14 @@ function MyPostsScreen(props: {
                 onChange={(e) => props.onChange((c) => ({ ...c, deposit: e.target.value }))}
               />
             </div>
-            <input
+            <ListingImageField
+              buttonLabel={props.t.myPosts.chooseImage}
+              helpText={props.t.myPosts.imageHelp}
+              imageUrl={props.form.image_url}
+              onChange={props.onChange}
+              onFileChange={handleImageChange}
               placeholder={props.t.myPosts.placeholderImage}
-              value={props.form.image_url}
-              onChange={(e) => props.onChange((c) => ({ ...c, image_url: e.target.value }))}
+              removeLabel={props.t.myPosts.removeImage}
             />
             <button className="primary-button" disabled={props.isBusy} type="submit">
               {props.isBusy ? props.t.common.publishing : props.t.common.publish}
@@ -1371,10 +1457,10 @@ function MyPostsScreen(props: {
           <div className="listing-grid">
             {myListings.map((listing) => (
               <article className="listing-card" key={listing.id}>
-                {listing.image_url && (
+                {getListingPhotos(listing)[0] && (
                   <div
                     className="listing-image"
-                    style={{ backgroundImage: `url(${listing.image_url})` }}
+                    style={{ backgroundImage: `url(${getListingPhotos(listing)[0]})` }}
                   />
                 )}
                 <div className="listing-body">
@@ -2023,7 +2109,7 @@ function ListingModal(props: {
 }) {
   const { listing, rentalCount, reviews, onMessageOwner, t, onClose } = props;
   const galleryRef = useRef<HTMLDivElement>(null);
-  const photos = listing.photo_urls?.length ? listing.photo_urls : [listing.image_url].filter(Boolean);
+  const photos = getListingPhotos(listing);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const hasListingRating = Number(listing.rating) > 0;
   const hasOwnerRating = Number(listing.owner.score) > 0;

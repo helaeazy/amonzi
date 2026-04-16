@@ -52,8 +52,9 @@ class ListingSerializer(serializers.ModelSerializer):
     owner_id = serializers.PrimaryKeyRelatedField(
         queryset=Member.objects.all(), source="owner", write_only=True
     )
+    image_url = serializers.CharField(required=False, allow_blank=True)
     photo_urls = serializers.ListField(
-        child=serializers.URLField(), required=False, allow_empty=True
+        child=serializers.CharField(), required=False, allow_empty=True
     )
     rating = serializers.DecimalField(max_digits=2, decimal_places=1, read_only=True)
     review_count = serializers.IntegerField(read_only=True)

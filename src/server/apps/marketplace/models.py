@@ -55,7 +55,7 @@ class Listing(models.Model):
     city = models.CharField(max_length=120)
     price_per_day = models.DecimalField(max_digits=8, decimal_places=2)
     deposit = models.DecimalField(max_digits=8, decimal_places=2, default=0)
-    image_url = models.URLField(blank=True)
+    image_url = models.TextField(blank=True)
     photo_urls = models.JSONField(default=list, blank=True)
     status = models.CharField(
         max_length=20, choices=Status.choices, default=Status.LIVE

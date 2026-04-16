@@ -11,3 +11,4 @@ dist/
 node_modules/
 src/client/node_modules/
 src/client/dist/
+src/server/db.sqlite3

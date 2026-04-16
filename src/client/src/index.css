@@ -234,6 +234,65 @@ h2 {
   resize: vertical;
 }
 
+.image-field {
+  display: grid;
+  gap: 10px;
+}
+
+.image-field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.image-field-label,
+.image-field-help {
+  color: rgba(22, 49, 31, 0.62);
+}
+
+.image-field-label {
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.image-field-help {
+  font-size: 0.88rem;
+}
+
+.image-field-picker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  padding: 14px 18px;
+  border-radius: 16px;
+  border: 1px dashed rgba(103, 162, 77, 0.32);
+  background: #f4fbe9;
+  color: #31563a;
+  font-weight: 700;
+}
+
+.image-field-picker input {
+  display: none;
+}
+
+.image-field-remove {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #5d8748;
+  font-weight: 700;
+}
+
+.image-field-preview {
+  min-height: 180px;
+  border-radius: 20px;
+  background-position: center;
+  background-size: cover;
+  border: 1px solid rgba(103, 162, 77, 0.16);
+}
+
 .tabbar {
   position: fixed;
   left: 16px;

@@ -8,6 +8,7 @@ load_dotenv(BASE_DIR / ".env")
 SECRET_KEY = "dev-secret-key"
 DEBUG = True
 ALLOWED_HOSTS = ["*"]
+SQLITE_PATH = Path(os.environ.get("SQLITE_PATH", str(BASE_DIR / "db.sqlite3")))
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -72,7 +73,7 @@ else:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
+            "NAME": SQLITE_PATH,
         }
     }
 

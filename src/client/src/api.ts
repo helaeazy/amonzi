@@ -49,6 +49,7 @@ export const api = {
     price_per_day: string;
     deposit: string;
     image_url: string;
+    photo_urls?: string[];
     status: string;
   }) =>
     request<Listing>("/listings/", {

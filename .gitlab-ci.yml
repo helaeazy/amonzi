@@ -157,7 +157,7 @@ client-build:
     # Deploy frontend to the Apache web root
     - rsync -az --delete -e "ssh -p 222" src/client/dist/ afp9vy@www697.your-server.de:$STATIC_PATH
     # Deploy backend to VPS
-    - rsync -az --delete -e "ssh" src/server/ root@62.238.2.39:/srv/amonzi/src/server/
+    - rsync -az --delete --exclude 'db.sqlite3' --exclude '.env' -e "ssh" src/server/ root@62.238.2.39:/srv/amonzi/src/server/
     - rsync -az -e "ssh" pyproject.toml uv.lock root@62.238.2.39:/srv/amonzi/
     - ssh root@62.238.2.39 "cd /srv/amonzi && export PATH=\$HOME/.local/bin:\$PATH && uv sync --frozen --python 3.12 && PYTHONPATH=/srv/amonzi/src/server uv run python src/server/manage.py migrate && systemctl restart amonzi"
 
